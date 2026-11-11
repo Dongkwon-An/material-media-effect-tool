@@ -100,9 +100,9 @@ export const CATEGORIES = [
     types: { ko: '라이트 아트 · 키네틱·로보틱 · 홀로그램·광학', en: 'Light art · Kinetic / robotic · Hologram / optical' },
     basis: { ko: '광원 + 전기·기계 장치', en: 'Light source + electrical or mechanical device' },
     shape: { ko: '은은하게 번지는 빛의 선(광원 튜브)', en: 'Tubes of light with a soft glow' },
-    rule: { ko: '빛의 선이 공중에 매달린 듯 천천히 돌고 흔들리며 서로 교차하고, 빛은 주변으로 은은하게 번진다', en: 'Lines of light turn and sway slowly as if hanging in the air, crossing each other, their light softly spreading around them' },
+    rule: { ko: '빛의 선이 공중에 매달린 듯 천천히 돌고 흔들리며 서로 교차하고, 빛은 주변으로 번지며 지나간 자리에 빛의 궤적을 남긴다', en: 'Lines of light turn and sway as if hanging in the air, crossing each other; their light spreads around them and leaves trails where they passed' },
     ref: { ko: '형광등·네온 튜브 설치, 공중에 매달려 움직이는 키네틱 조각', en: 'Fluorescent and neon tube installations, kinetic sculptures hanging in the air' },
-    defaults: { ...COMMON, count: 3, spacing: 1, length: 0.85, spin: 1, tilt: 22, duration: 3, glow: 1, colorShift: 0.9 },
+    defaults: { ...COMMON, count: 3, spacing: 1, length: 0.85, spin: 1, tilt: 22, duration: 3, glow: 1, echoLength: 90, echoDensity: 1.4, echoOpacity: 1, colorShift: 0.9 },
   },
   {
     id: 'performance', motion: 'dance', gradient: 'magenta-saffron', camera: 'orbit',

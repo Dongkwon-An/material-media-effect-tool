@@ -2,8 +2,8 @@ import * as THREE from 'three';
 import { LineSegments2 } from 'three/addons/lines/LineSegments2.js';
 import { LineSegmentsGeometry } from 'three/addons/lines/LineSegmentsGeometry.js';
 import { LineMaterial } from 'three/addons/lines/LineMaterial.js';
-import * as BRAND from './brand.js?v=20261111h'; // ?v= makes the browser load fresh copies after an update
-import { I18N } from './i18n.js?v=20261111h';
+import * as BRAND from './brand.js?v=20261112a'; // ?v= makes the browser load fresh copies after an update
+import { I18N } from './i18n.js?v=20261112a';
 
 /* =========================================================
    State
@@ -131,7 +131,7 @@ const MOTION_GROUPS = {
   ],
   neon: [
     { key: 'motion', desc: 'descNeon', rows: [R.lightCount, R.lightSpacing, R.length, R.turnSpeed, R.swingTilt, R.cycleTime] },
-    { key: 'echoes', desc: 'descGlow', rows: [R.glow, R.colorShift, R.thickness] },
+    { key: 'echoes', desc: 'descGlow', rows: [R.glow, R.echoLength, R.echoDensity, R.echoOpacity, R.colorShift, R.air, R.thickness] },
   ],
   spin: [
     { key: 'motion', desc: 'descMotion', rows: [R.length, R.spin, R.tilt, R.lightDuration, R.lightCount, R.lightSpacing] },
@@ -1099,31 +1099,56 @@ function buildNeon(g, base, W0) {
       hue: n === 1 ? 0.5 : i / (n - 1),
     });
   }
-  g.glow = GLOW_LAYERS.map((l, li) => makeDyn(g, l.px, n + 4, 1, li === 0 ? 3 : 2 - li * 0.15));
+  g.dTrail = makeDyn(g, BRAND.LINE.px, n * 242 + 4, 8, 0);                     // the trail sits behind the light
+  g.glow = GLOW_LAYERS.map((l, li) => makeDyn(g, l.px, n + 4, 1, li === 0 ? 3.2 : 2 - li * 0.15));
+  g.rim = makeDyn(g, 12, n + 4, 1, 3);                                             // a coloured band around the core
   g.update = updateNeon;
 }
-const nqA = new THREE.Quaternion(), nqB = new THREE.Quaternion(), nD = new THREE.Vector3(), nCtr = new THREE.Vector3(), nP0 = new THREE.Vector3(), nP1 = new THREE.Vector3(), nCol = new THREE.Color(), nCol2 = new THREE.Color(), nWhite = new THREE.Color('#FFFFFF');
+const nqA = new THREE.Quaternion(), nqB = new THREE.Quaternion(), nD = new THREE.Vector3(), nCtr = new THREE.Vector3(), nP0 = new THREE.Vector3(), nP1 = new THREE.Vector3(), nL0 = new THREE.Vector3(), nL1 = new THREE.Vector3(), nCol = new THREE.Color(), nCol2 = new THREE.Color(), nWhite = new THREE.Color('#FFFFFF');
+function tubeAt(g, tb, T, len, W0) {
+  // motor: a slow, steady turn; pendulum: a gentle swing; float: up and down
+  const p = g.p, a = (Math.PI * 2 * T) / (p.duration * 4);
+  nqA.setFromAxisAngle(tb.axis, tb.start + tb.dir * a * p.spin * 0.5);
+  nqB.setFromAxisAngle(tb.swingAxis, THREE.MathUtils.degToRad(p.tilt) * Math.sin(a + tb.phase));
+  nD.set(1, 0, 0).applyQuaternion(nqA).applyQuaternion(nqB);
+  nCtr.copy(tb.c); nCtr.y += W0 * 0.06 * Math.sin(a * 0.5 + tb.phase);
+  nP0.copy(nCtr).addScaledVector(nD, -0.5 * len);
+  nP1.copy(nCtr).addScaledVector(nD, 0.5 * len);
+}
 function updateNeon(g, T) {
-  const p = g.p, W0 = 0.46 * stageDims().Ws, len = p.length * W0, period = p.duration * 4, glow = p.glow ?? 1;
-  g.glow.forEach(dynBegin);
+  const p = g.p, W0 = 0.46 * stageDims().Ws, len = p.length * W0, glow = p.glow ?? 1;
+  // on a light background a white-hot core disappears, so the coloured light around it does the work:
+  // a strong colour rim hugs the core and the glow is laid on thicker
+  const light = bgCol.r * 0.3 + bgCol.g * 0.59 + bgCol.b * 0.11 > 0.6;
+  const glowK = light ? 2.4 : 1, coreWhite = light ? 0.8 : 0.55;
+  g.glow.forEach(dynBegin); dynBegin(g.dTrail); dynBegin(g.rim);
+  const Lh = Math.min(240, p.echoLength), dt = BRAND.ECHO.spacing / p.echoDensity;
   g.tubes.forEach(tb => {
-    const a = (Math.PI * 2 * T) / period;
-    // motor: a slow, steady turn; pendulum: a gentle swing; float: up and down
-    nqA.setFromAxisAngle(tb.axis, tb.start + tb.dir * a * p.spin * 0.5);
-    nqB.setFromAxisAngle(tb.swingAxis, THREE.MathUtils.degToRad(p.tilt) * Math.sin(a + tb.phase));
-    nD.set(1, 0, 0).applyQuaternion(nqA).applyQuaternion(nqB);
-    nCtr.copy(tb.c); nCtr.y += W0 * 0.06 * Math.sin(a * 0.5 + tb.phase);
-    // one straight segment per layer, coloured from one end to the other: a single piece, so the glow has no beads at joints
-    nP0.copy(nCtr).addScaledVector(nD, -0.5 * len);
-    nP1.copy(nCtr).addScaledVector(nD, 0.5 * len);
+    // the trail: where the tube was a moment ago, line after line (the rhythm of a rotating light)
+    let have = false;
+    for (let k = Lh; k >= 1; k--) {
+      tubeAt(g, tb, T - k * dt, len, W0);
+      // skip a line when the tube has hardly moved since the last one, so lines never pile up into solid strokes
+      if (have && (nP0.distanceTo(nL0) + nP1.distanceTo(nL1)) / len < 0.03) continue;
+      nL0.copy(nP0); nL1.copy(nP1); have = true;
+      const age = k / Lh, bk = Math.min(7, Math.floor(age * 8));
+      nCol.copy(gcol(g, (tb.hue * 0.5 + age * 0.5) * p.colorShift)); airy(nCol, (p.air ?? 0) * age);
+      dynSeg(g.dTrail, bk, nP0, nP1, nCol);
+    }
+    tubeAt(g, tb, T, len, W0);
     GLOW_LAYERS.forEach((l, li) => {
-      nCol.copy(gcol(g, tb.hue * 0.5 * p.colorShift)).lerp(nWhite, l.white);
-      nCol2.copy(gcol(g, (tb.hue * 0.5 + 0.5) * p.colorShift)).lerp(nWhite, l.white);
+      const w = li === 0 ? coreWhite : l.white;
+      nCol.copy(gcol(g, tb.hue * 0.5 * p.colorShift)).lerp(nWhite, w);
+      nCol2.copy(gcol(g, (tb.hue * 0.5 + 0.5) * p.colorShift)).lerp(nWhite, w);
       dynSeg(g.glow[li], 0, nP0, nP1, nCol, nCol2);
     });
+    nCol.copy(gcol(g, tb.hue * 0.5 * p.colorShift)); nCol2.copy(gcol(g, (tb.hue * 0.5 + 0.5) * p.colorShift));
+    dynSeg(g.rim, 0, nP0, nP1, nCol, nCol2);
   });
-  GLOW_LAYERS.forEach((l, li) => { g.glow[li].alpha[0] = li === 0 ? l.a : Math.min(1, l.a * glow); });
-  g.glow.forEach(dynEnd);
+  GLOW_LAYERS.forEach((l, li) => { g.glow[li].alpha[0] = li === 0 ? l.a : Math.min(1, l.a * glow * glowK); });
+  g.rim.alpha[0] = light ? Math.min(1, 0.9 * Math.max(0.3, glow)) : 0.5;
+  for (let b = 0; b < 8; b++) g.dTrail.alpha[b] = Math.min(1, 0.6 * Math.pow(1 - b / 8, 1.1) * p.echoOpacity);
+  g.glow.forEach(dynEnd); dynEnd(g.rim); dynEnd(g.dTrail);
 }
 
 /* =========================================================
