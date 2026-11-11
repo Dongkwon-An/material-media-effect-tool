@@ -2,8 +2,8 @@ import * as THREE from 'three';
 import { LineSegments2 } from 'three/addons/lines/LineSegments2.js';
 import { LineSegmentsGeometry } from 'three/addons/lines/LineSegmentsGeometry.js';
 import { LineMaterial } from 'three/addons/lines/LineMaterial.js';
-import * as BRAND from './brand.js?v=20261110e'; // ?v= makes the browser load fresh copies after an update
-import { I18N } from './i18n.js?v=20261110e';
+import * as BRAND from './brand.js?v=20261111a'; // ?v= makes the browser load fresh copies after an update
+import { I18N } from './i18n.js?v=20261111a';
 
 /* =========================================================
    State
@@ -70,10 +70,19 @@ const R = {
   // performance
   armThickness: { k: 'thickness', c: true, type: 'range', label: 'armThickness', min: 0.3, max: 3, step: 0.05, unit: '×' },
   boxLength: { k: 'length', c: true, type: 'range', label: 'boxLength', min: 0.4, max: 2, step: 0.05, unit: '×' },
-  performers: { k: 'count', c: true, type: 'select', label: 'performers', opts: [[1, '1'], [2, '2'], [3, '3']], num: true, literalOpts: true },
+  performers: { k: 'count', c: true, type: 'select', label: 'performers', opts: [[1, '1'], [2, '2'], [3, '3'], [4, '4']], num: true, literalOpts: true },
   performerSpacing: { k: 'spacing', c: true, type: 'range', label: 'performerSpacing', min: 0.3, max: 2, step: 0.05, unit: '×' },
   amplitude: { k: 'amplitude', c: true, type: 'range', label: 'swingRange', min: 0, max: 1.8, step: 0.05, unit: '×' },
   stepTime: { k: 'duration', c: true, type: 'range', label: 'stepTime', min: 0.4, max: 4, step: 0.05, unit: 's' },
+  together: { k: 'behaviour', c: true, type: 'select', label: 'together', opts: [['canon', 'canon'], ['unison', 'unison'], ['free', 'solo']] },
+  bpm: { k: 'bpm', c: true, type: 'range', label: 'bpm', min: 60, max: 160, step: 1 },
+  accent: { k: 'accent', c: true, type: 'range', label: 'accent', min: 0, max: 0.9, step: 0.01 },
+  figureSize: { k: 'amplitude', c: true, type: 'range', label: 'figureSize', min: 0.3, max: 2, step: 0.05, unit: '×' },
+  twist: { k: 'twist', c: true, type: 'range', label: 'twist', min: 0, max: 3, step: 0.05, unit: '×' },
+  danceStage: { k: 'spread', c: true, type: 'range', label: 'stageSize', min: 0.4, max: 1.6, step: 0.05, unit: '×' },
+  ribbon: { k: 'ribbon', c: true, type: 'range', label: 'ribbon', min: 1, max: 12, step: 0.5 },
+  ribbonWidth: { k: 'ribbonWidth', c: true, type: 'range', label: 'ribbonWidth', min: 0.3, max: 3, step: 0.05, unit: '×' },
+  strands: { k: 'strands', c: true, type: 'range', label: 'strands', min: 1, max: 8, step: 1 },
   // digital image
   // smallest sheet compared with the largest, as a ratio of lengths (each step is ×1/√2, so 2 steps halve it)
   smallest: { k: 'steps', c: true, type: 'select', label: 'smallest', opts: [[2, '1:2'], [4, '1:4'], [6, '1:8'], [8, '1:16']], num: true, literalOpts: true },
@@ -120,6 +129,10 @@ const MOTION_GROUPS = {
     { key: 'motion', desc: 'descMotion', rows: [R.length, R.spin, R.tilt, R.lightDuration, R.lightCount, R.lightSpacing] },
     { key: 'echoes', desc: 'descEchoes', rows: ECHO_ROWS },
   ],
+  dance: [
+    { key: 'motion', desc: 'descDance', rows: [R.performers, R.together, R.bpm, R.accent, R.figureSize, R.twist, R.danceStage] },
+    { key: 'echoes', desc: 'descRibbon', rows: [R.ribbon, R.ribbonWidth, R.strands, R.echoOpacity, R.colorShift, R.air, R.thickness] },
+  ],
   arm: [
     { key: 'motion', desc: 'descBody', rows: [R.performers, R.performerSpacing, R.boxLength, R.armThickness, R.amplitude, R.stepTime, R.interval] },
     { key: 'echoes', desc: 'descEchoes', rows: ECHO_ROWS },
@@ -149,7 +162,7 @@ const GLOBAL_SECTIONS = [
   ] },
 ];
 const CAMERA_KEYS = new Set(['camera', 'camDist', 'returnFront', 'panX', 'panY']);
-const LIVE_CAT_KEYS = new Set(['echoDensity', 'echoOpacity', 'colorShift', 'distanceFade', 'echoLength', 'reverse', 'lineColor', 'history', 'layerDepth', 'air', 'cropMarks', 'tick', 'gap', 'turnRate']);
+const LIVE_CAT_KEYS = new Set(['echoDensity', 'echoOpacity', 'colorShift', 'distanceFade', 'echoLength', 'reverse', 'lineColor', 'history', 'layerDepth', 'air', 'bpm', 'accent', 'twist', 'ribbon', 'ribbonWidth', 'cropMarks', 'tick', 'gap', 'turnRate']);
 
 /* =========================================================
    Sidebar rendering
@@ -509,6 +522,7 @@ function buildCategory(id) {
   } else if (cat.motion === 'format') buildFormat(g, base, W0, common);
   else if (cat.motion === 'net') buildNet(g, base, W0);
   else if (cat.motion === 'grid') buildGrid(g, base, W0);
+  else if (cat.motion === 'dance') buildDance(g, base, W0);
   else if (cat.motion === 'arm') {
     const n = p.count, shrink = n === 1 ? 1 : n === 2 ? 0.8 : 0.68;
     MULTI[n].forEach((o, i) => {
@@ -940,6 +954,128 @@ function walkState(u, time, out) {
   out.q.copy(wkQ);
   out.dims.set(W.len, W.thick, W.thick);
   return out;
+}
+
+/* ---------------------------------------------------------
+   Performance: dance. Each performer is one ribbon of lines.
+   Why a line: a performance leaves no object behind, only the
+     path the body traced, so the performer is drawn as that trace.
+   Why this rhythm: the motion counts in beats (BPM) and 8-count
+     phrases, as dancers do; each beat has an accent: the ribbon
+     whips forward on the beat and glides between beats.
+   Why these places: the stage is split into nine areas (up/centre/
+     downstage × left/centre/right). Every 8 counts a performer
+     travels to another area, as in blocking a choreography.
+   Why these shapes: within a phrase the performer repeats one of
+     four basic ribbon-dance figures: circle, spiral, snake, figure 8.
+   Why it twists: the ribbon turns about its own length whenever the
+     performer turns, so a twist marks a turn of the body.
+   Several performers dance in unison, in canon (the same phrase a
+     couple of beats later) or each their own solo.
+   --------------------------------------------------------- */
+const FIGURES = ['circle', 'spiral', 'snake', 'eight'];
+function danceSeq(d, k) {
+  // stage area and figure for phrase k (one 8-count); depends only on k, so every frame agrees
+  const cache = d.cache;
+  if (cache.has(k)) return cache.get(k);
+  const raw = i => { const r = rng(d.seed + i * 7919); return [r(), r(), r(), r()]; };
+  const [a, f, t, j] = raw(k), prevA = Math.floor(raw(k - 1)[0] * 9);
+  let area = Math.floor(a * 9);
+  if (area === prevA) area = (area + 1 + Math.floor(j * 8)) % 9; // always move to another area
+  const v = { area, figure: FIGURES[Math.floor(f * FIGURES.length)], turn: t < 0.5 ? 1 : -1 };
+  cache.set(k, v);
+  if (cache.size > 200) cache.delete(cache.keys().next().value);
+  return v;
+}
+function figureAt(fig, tau, u, R, turn) {
+  // the four basic figures, each looping on the beat count
+  const TAU = Math.PI * 2;
+  if (fig === 'circle') { const a = TAU * tau / 2 * turn; return [R * Math.cos(a), R * Math.sin(a), 0]; }               // one loop every 2 beats, upright
+  if (fig === 'spiral') { const a = TAU * tau / 2 * turn, rr = R * (0.5 + 0.5 * u); return [rr * Math.cos(a), R * 0.9 * (u - 0.5), rr * Math.sin(a)]; } // flat loops that rise and widen over the phrase
+  if (fig === 'snake') return [R * 0.25 * Math.sin(TAU * tau / 8), R * 0.55 * Math.sin(Math.PI * tau), R * 0.6 * Math.sin(TAU * tau / 4) * turn]; // side to side on every beat
+  const a = TAU * tau / 4 * turn; return [R * 1.1 * Math.sin(a), R * 0.7 * Math.sin(a) * Math.cos(a), R * 0.3 * Math.cos(a)];            // figure 8 over 4 beats
+}
+const dvA = new THREE.Vector3(), dvB = new THREE.Vector3(), dvC = new THREE.Vector3(), dvD = new THREE.Vector3();
+function danceHead(g, d, T, out) {
+  // position of the performer's hand (the ribbon's head) at time T, and the twist angle
+  const p = g.p, S = g.stage, beat = 60 / p.bpm, B = T / beat + d.delay;
+  const b = Math.floor(B), f = B - b, acc = Math.min(0.9, p.accent);
+  const tau = b + f + (acc / (2 * Math.PI)) * Math.sin(2 * Math.PI * f); // fastest on the beat, slowest between beats
+  const k = Math.floor(tau / 8), u = (tau - 8 * k) / 8;
+  const A = i => S.areas[danceSeq(d, i).area];
+  // travel between areas with a continuous Catmull-Rom path, one area per 8 counts
+  const P0 = A(k - 1), P1 = A(k), P2 = A(k + 1), P3 = A(k + 2), e = u;
+  const cr = (a, b2, c, dd) => 0.5 * (2 * b2 + (-a + c) * e + (2 * a - 5 * b2 + 4 * c - dd) * e * e + (-a + 3 * b2 - 3 * c + dd) * e * e * e);
+  out.set(cr(P0.x, P1.x, P2.x, P3.x), cr(P0.y, P1.y, P2.y, P3.y), cr(P0.z, P1.z, P2.z, P3.z));
+  const R = S.R, cur = danceSeq(d, k), nxt = danceSeq(d, k + 1);
+  const f1 = figureAt(cur.figure, tau, u, R, cur.turn), f2 = figureAt(nxt.figure, tau, 0, R, nxt.turn);
+  const w = THREE.MathUtils.smoothstep(u, 0.8, 1); // the last count blends into the next figure
+  out.x += f1[0] * (1 - w) + f2[0] * w; out.y += f1[1] * (1 - w) + f2[1] * w; out.z += f1[2] * (1 - w) + f2[2] * w;
+  out.y -= R * 0.12 * Math.cos(2 * Math.PI * tau); // a small bend of the knees on every beat
+  out.add(d.offset).add(S.o);
+  // the body turns a quarter turn on every beat (× twist), so the ribbon rolls with it
+  return Math.PI * p.twist * tau * 0.25 * cur.turn;
+}
+function buildDance(g, base, W0) {
+  const p = g.p, n = p.count, sp = p.spread;
+  const areas = [];
+  for (let z = -1; z <= 1; z++) for (let x = -1; x <= 1; x++) areas.push(new THREE.Vector3(x * W0 * 0.62 * sp, z * W0 * 0.1 * sp, -z * W0 * 0.5 * sp)); // upstage sits a little higher and further back
+  g.stage = { o: base.clone(), areas, R: W0 * 0.3 * p.amplitude };
+  g.dancers = [];
+  for (let i = 0; i < n; i++) {
+    const mode = p.behaviour;
+    const seed = mode === 'free' ? 3100 + i * 977 : 3100;
+    const delay = mode === 'canon' ? -i * 2 : mode === 'free' ? i * 3 : 0; // canon: two beats behind the one before
+    const offset = mode === 'unison' ? new THREE.Vector3((i - (n - 1) / 2) * W0 * 0.28, 0, (i % 2) * W0 * 0.1) : new THREE.Vector3();
+    g.dancers.push({ seed, delay, offset, cache: new Map(), hue: n > 1 ? i / (n - 1) : 0 });
+  }
+  const maxS = 2 + Math.round(p.strands);
+  g.dEdge = makeDyn(g, BRAND.LINE.px, n * 2 * 400 + 8, 8, 2);
+  g.dInner = makeDyn(g, BRAND.LINE.linkPx, n * maxS * 400 + 8, 8, 1);
+  g.update = updateDance;
+}
+const rbP = [], rbW = [];
+for (let i = 0; i < 402; i++) { rbP.push(new THREE.Vector3()); rbW.push(new THREE.Vector3()); }
+const rbT = new THREE.Vector3(), rbN = new THREE.Vector3(), rbB = new THREE.Vector3(), rbUp = new THREE.Vector3(), rbX = new THREE.Vector3(1, 0, 0), rbY = new THREE.Vector3(0, 1, 0);
+const rbQ1 = new THREE.Vector3(), rbQ2 = new THREE.Vector3();
+function updateDance(g, T) {
+  const p = g.p, beat = 60 / p.bpm, L = Math.min(400, Math.max(8, Math.round((p.ribbon * beat) / 0.012)));
+  const dt = (p.ribbon * beat) / L, half = g.stage.R * 0.32 * p.ribbonWidth, m = Math.max(1, Math.round(p.strands));
+  [g.dEdge, g.dInner].forEach(dynBegin);
+  g.dancers.forEach(d => {
+    // sample the path behind the head, and a twisting width vector at each point
+    const roll = [];
+    for (let k = 0; k <= L; k++) roll.push(danceHead(g, d, T - k * dt, rbP[k]));
+    for (let k = 0; k <= L; k++) {
+      rbT.copy(rbP[Math.max(0, k - 1)]).sub(rbP[Math.min(L, k + 1)]);
+      if (rbT.lengthSq() < 1e-10) rbT.set(1, 0, 0);
+      rbT.normalize();
+      // carry the ribbon's side direction along the path (no sudden flips), then roll it by the twist
+      if (k === 0) rbUp.copy(Math.abs(rbT.y) < 0.9 ? rbY : rbX); else rbUp.copy(rbN);
+      rbN.copy(rbUp).addScaledVector(rbT, -rbT.dot(rbUp));
+      if (rbN.lengthSq() < 1e-10) rbN.copy(Math.abs(rbT.y) < 0.9 ? rbY : rbX).addScaledVector(rbT, -rbT.dot(Math.abs(rbT.y) < 0.9 ? rbY : rbX));
+      rbN.normalize();
+      rbB.crossVectors(rbT, rbN);
+      const age = k / L, taper = Math.min(1, (1 - age) * 5) * Math.min(1, 0.35 + age * 6);
+      rbW[k].copy(rbN).multiplyScalar(Math.cos(roll[k])).addScaledVector(rbB, Math.sin(roll[k])).multiplyScalar(half * taper);
+    }
+    for (let k = 0; k < L; k++) {
+      const age = k / L, bk = Math.min(7, Math.floor(age * 8));
+      const c = airy(gcol(g, age * p.colorShift * 0.8 + d.hue * 0.25), (p.air ?? 0) * Math.pow(age, 1.3));
+      for (let j = -m; j <= m; j++) {
+        const s = j / m;
+        rbQ1.copy(rbP[k]).addScaledVector(rbW[k], s);
+        rbQ2.copy(rbP[k + 1]).addScaledVector(rbW[k + 1], s);
+        dynSeg(Math.abs(j) === m ? g.dEdge : g.dInner, bk, rbQ1, rbQ2, c);
+      }
+    }
+  });
+  for (let b = 0; b < 8; b++) {
+    const a = Math.pow(1 - b / 8, 0.8) * p.echoOpacity;
+    g.dEdge.alpha[b] = Math.min(1, 0.95 * a);
+    g.dInner.alpha[b] = Math.min(1, 0.45 * a);
+  }
+  [g.dEdge, g.dInner].forEach(dynEnd);
 }
 
 /* =========================================================
