@@ -2,8 +2,8 @@ import * as THREE from 'three';
 import { LineSegments2 } from 'three/addons/lines/LineSegments2.js';
 import { LineSegmentsGeometry } from 'three/addons/lines/LineSegmentsGeometry.js';
 import { LineMaterial } from 'three/addons/lines/LineMaterial.js';
-import * as BRAND from './brand.js?v=20261111f'; // ?v= makes the browser load fresh copies after an update
-import { I18N } from './i18n.js?v=20261111f';
+import * as BRAND from './brand.js?v=20261111g'; // ?v= makes the browser load fresh copies after an update
+import { I18N } from './i18n.js?v=20261111g';
 
 /* =========================================================
    State
@@ -79,9 +79,9 @@ const R = {
   accent: { k: 'accent', c: true, type: 'range', label: 'accent', min: 0, max: 0.9, step: 0.01 },
   figureSize: { k: 'amplitude', c: true, type: 'range', label: 'figureSize', min: 0.3, max: 2, step: 0.05, unit: '×' },
   twist: { k: 'twist', c: true, type: 'range', label: 'twist', min: 0, max: 3, step: 0.05, unit: '×' },
-  danceStage: { k: 'spread', c: true, type: 'range', label: 'stageSize', min: 0.4, max: 1.6, step: 0.05, unit: '×' },
-  ribbon: { k: 'ribbon', c: true, type: 'range', label: 'ribbon', min: 1, max: 12, step: 0.5 },
-  ribbonWidth: { k: 'ribbonWidth', c: true, type: 'range', label: 'ribbonWidth', min: 0.3, max: 3, step: 0.05, unit: '×' },
+  danceStage: { k: 'spread', c: true, type: 'range', label: 'danceSize', min: 0.4, max: 1.6, step: 0.05, unit: '×' },
+  ribbon: { k: 'ribbon', c: true, type: 'range', label: 'ribbonLen', min: 1, max: 12, step: 0.5 },
+  ribbonWidth: { k: 'ribbonWidth', c: true, type: 'range', label: 'ribbonW', min: 0.3, max: 3, step: 0.05, unit: '×' },
   strands: { k: 'strands', c: true, type: 'range', label: 'strands', min: 1, max: 8, step: 1 },
   // digital image
   // smallest sheet compared with the largest, as a ratio of lengths (each step is ×1/√2, so 2 steps halve it)
