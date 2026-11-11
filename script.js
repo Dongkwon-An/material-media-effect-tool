@@ -2,8 +2,8 @@ import * as THREE from 'three';
 import { LineSegments2 } from 'three/addons/lines/LineSegments2.js';
 import { LineSegmentsGeometry } from 'three/addons/lines/LineSegmentsGeometry.js';
 import { LineMaterial } from 'three/addons/lines/LineMaterial.js';
-import * as BRAND from './brand.js?v=20261111g'; // ?v= makes the browser load fresh copies after an update
-import { I18N } from './i18n.js?v=20261111g';
+import * as BRAND from './brand.js?v=20261111h'; // ?v= makes the browser load fresh copies after an update
+import { I18N } from './i18n.js?v=20261111h';
 
 /* =========================================================
    State
@@ -59,6 +59,10 @@ const R = {
   lightCount: { k: 'count', c: true, type: 'select', label: 'lightCount', opts: [1, 2, 3, 4, 5, 6].map(n => [n, String(n)]), num: true, literalOpts: true },
   lightSpacing: { k: 'spacing', c: true, type: 'range', label: 'lightSpacing', min: 0, max: 2, step: 0.05, unit: '×' },
   lightDuration: { k: 'duration', c: true, type: 'range', label: 'duration', min: 0.8, max: 6, step: 0.1, unit: 's' },
+  glow: { k: 'glow', c: true, type: 'range', label: 'glow', min: 0, max: 2.5, step: 0.05, unit: '×' },
+  swingTilt: { k: 'tilt', c: true, type: 'range', label: 'swingTilt', min: 0, max: 60, step: 1, unit: '°' },
+  turnSpeed: { k: 'spin', c: true, type: 'range', label: 'turnSpeed', min: 0, max: 4, step: 0.05, unit: '×' },
+  cycleTime: { k: 'duration', c: true, type: 'range', label: 'cycleTime', min: 1, max: 8, step: 0.1, unit: 's' },
   // software
   rule: { k: 'rule', c: true, type: 'select', label: 'rule', opts: [['fill', 'ruleFill'], ['life', 'ruleLife'], ['blocks', 'ruleBlocks']] },
   cols: { k: 'cols', c: true, type: 'select', label: 'cols', opts: [12, 16, 24, 32, 40].map(n => [n, String(n)]), num: true, literalOpts: true },
@@ -125,6 +129,10 @@ const MOTION_GROUPS = {
     { key: 'motion', desc: 'descNet', rows: [R.crossCols, R.spread, R.gap, R.packets, R.waveTime, R.turnRate] },
     { key: 'echoes', desc: 'descEchoes', rows: [R.echoLength, R.echoDensity, R.echoOpacity, R.colorShift, R.air, R.thickness] },
   ],
+  neon: [
+    { key: 'motion', desc: 'descNeon', rows: [R.lightCount, R.lightSpacing, R.length, R.turnSpeed, R.swingTilt, R.cycleTime] },
+    { key: 'echoes', desc: 'descGlow', rows: [R.glow, R.colorShift, R.thickness] },
+  ],
   spin: [
     { key: 'motion', desc: 'descMotion', rows: [R.length, R.spin, R.tilt, R.lightDuration, R.lightCount, R.lightSpacing] },
     { key: 'echoes', desc: 'descEchoes', rows: ECHO_ROWS },
@@ -162,7 +170,7 @@ const GLOBAL_SECTIONS = [
   ] },
 ];
 const CAMERA_KEYS = new Set(['camera', 'camDist', 'returnFront', 'panX', 'panY']);
-const LIVE_CAT_KEYS = new Set(['echoDensity', 'echoOpacity', 'colorShift', 'distanceFade', 'echoLength', 'reverse', 'lineColor', 'history', 'layerDepth', 'air', 'bpm', 'accent', 'twist', 'ribbon', 'ribbonWidth', 'cropMarks', 'tick', 'gap', 'turnRate']);
+const LIVE_CAT_KEYS = new Set(['echoDensity', 'echoOpacity', 'colorShift', 'distanceFade', 'echoLength', 'reverse', 'lineColor', 'history', 'layerDepth', 'air', 'glow', 'bpm', 'accent', 'twist', 'ribbon', 'ribbonWidth', 'cropMarks', 'tick', 'gap', 'turnRate']);
 
 /* =========================================================
    Sidebar rendering
@@ -523,6 +531,7 @@ function buildCategory(id) {
   else if (cat.motion === 'net') buildNet(g, base, W0);
   else if (cat.motion === 'grid') buildGrid(g, base, W0);
   else if (cat.motion === 'dance') buildDance(g, base, W0);
+  else if (cat.motion === 'neon') buildNeon(g, base, W0);
   else if (cat.motion === 'arm') {
     const n = p.count, shrink = n === 1 ? 1 : n === 2 ? 0.8 : 0.68;
     MULTI[n].forEach((o, i) => {
@@ -1063,6 +1072,58 @@ function updateDance(g, T) {
   });
   g.dEdge.alpha[0] = 0.95; g.dInner.alpha[0] = 0.55;
   [g.dEdge, g.dInner].forEach(dynEnd);
+}
+
+/* ---------------------------------------------------------
+   Light & kinetic: glowing tubes moving in the air.
+   Each light is a tube of light (a line) with a soft glow around it,
+   drawn as a bright core and wider, fainter lines of the same colour
+   (no blur, no grain: the glow is just more lines).
+   Each tube hangs in the air like a kinetic sculpture: it turns slowly
+   about a tilted axis, as if driven by a small motor, swings a little
+   like a pendulum and floats up and down. The tubes cross each other
+   as they turn. No echoes: light is only where the tube is now.
+   --------------------------------------------------------- */
+const NEON_SEG = 24;
+// a bright core, then many wide, faint copies growing step by step: stacked, they fade out smoothly like light spreading
+const GLOW_LAYERS = [{ px: 6, a: 1, white: 0.55 }].concat(Array.from({ length: 12 }, (_, i) => ({ px: Math.round(9 * Math.pow(1.32, i)), a: 0.075, white: i < 2 ? 0.2 : 0 })));
+function buildNeon(g, base, W0) {
+  const p = g.p, n = p.count;
+  g.tubes = [];
+  for (let i = 0; i < n; i++) {
+    const f = n === 1 ? 0 : i / (n - 1) - 0.5, r = k => seeded(9100 + i * 31 + k);
+    g.tubes.push({
+      c: base.clone().add(new THREE.Vector3(f * W0 * 0.9 * p.spacing, (r(1) - 0.5) * W0 * 0.35 * p.spacing, (r(2) - 0.5) * W0 * 0.5 * p.spacing)),
+      axis: new THREE.Vector3((r(3) - 0.5) * 0.8, 1, (r(4) - 0.5) * 0.8).normalize(), // each motor axis leans a little
+      start: r(5) * Math.PI * 2, dir: r(6) < 0.5 ? 1 : -1, phase: r(7) * Math.PI * 2, swingAxis: new THREE.Vector3(1, 0, (r(8) - 0.5)).normalize(),
+      hue: n === 1 ? 0.5 : i / (n - 1),
+    });
+  }
+  g.glow = GLOW_LAYERS.map((l, li) => makeDyn(g, l.px, n + 4, 1, li === 0 ? 3 : 2 - li * 0.15));
+  g.update = updateNeon;
+}
+const nqA = new THREE.Quaternion(), nqB = new THREE.Quaternion(), nD = new THREE.Vector3(), nCtr = new THREE.Vector3(), nP0 = new THREE.Vector3(), nP1 = new THREE.Vector3(), nCol = new THREE.Color(), nCol2 = new THREE.Color(), nWhite = new THREE.Color('#FFFFFF');
+function updateNeon(g, T) {
+  const p = g.p, W0 = 0.46 * stageDims().Ws, len = p.length * W0, period = p.duration * 4, glow = p.glow ?? 1;
+  g.glow.forEach(dynBegin);
+  g.tubes.forEach(tb => {
+    const a = (Math.PI * 2 * T) / period;
+    // motor: a slow, steady turn; pendulum: a gentle swing; float: up and down
+    nqA.setFromAxisAngle(tb.axis, tb.start + tb.dir * a * p.spin * 0.5);
+    nqB.setFromAxisAngle(tb.swingAxis, THREE.MathUtils.degToRad(p.tilt) * Math.sin(a + tb.phase));
+    nD.set(1, 0, 0).applyQuaternion(nqA).applyQuaternion(nqB);
+    nCtr.copy(tb.c); nCtr.y += W0 * 0.06 * Math.sin(a * 0.5 + tb.phase);
+    // one straight segment per layer, coloured from one end to the other: a single piece, so the glow has no beads at joints
+    nP0.copy(nCtr).addScaledVector(nD, -0.5 * len);
+    nP1.copy(nCtr).addScaledVector(nD, 0.5 * len);
+    GLOW_LAYERS.forEach((l, li) => {
+      nCol.copy(gcol(g, tb.hue * 0.5 * p.colorShift)).lerp(nWhite, l.white);
+      nCol2.copy(gcol(g, (tb.hue * 0.5 + 0.5) * p.colorShift)).lerp(nWhite, l.white);
+      dynSeg(g.glow[li], 0, nP0, nP1, nCol, nCol2);
+    });
+  });
+  GLOW_LAYERS.forEach((l, li) => { g.glow[li].alpha[0] = li === 0 ? l.a : Math.min(1, l.a * glow); });
+  g.glow.forEach(dynEnd);
 }
 
 /* =========================================================
