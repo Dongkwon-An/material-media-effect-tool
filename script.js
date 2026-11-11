@@ -2,8 +2,8 @@ import * as THREE from 'three';
 import { LineSegments2 } from 'three/addons/lines/LineSegments2.js';
 import { LineSegmentsGeometry } from 'three/addons/lines/LineSegmentsGeometry.js';
 import { LineMaterial } from 'three/addons/lines/LineMaterial.js';
-import * as BRAND from './brand.js?v=20261111a'; // ?v= makes the browser load fresh copies after an update
-import { I18N } from './i18n.js?v=20261111a';
+import * as BRAND from './brand.js?v=20261111b'; // ?v= makes the browser load fresh copies after an update
+import { I18N } from './i18n.js?v=20261111b';
 
 /* =========================================================
    State
@@ -988,19 +988,19 @@ function danceSeq(d, k) {
   return v;
 }
 function figureAt(fig, tau, u, R, turn) {
-  // the four basic figures, each looping on the beat count
+  // the four basic figures; slow, long loops so the ribbon flows instead of jerking
   const TAU = Math.PI * 2;
-  if (fig === 'circle') { const a = TAU * tau / 2 * turn; return [R * Math.cos(a), R * Math.sin(a), 0]; }               // one loop every 2 beats, upright
-  if (fig === 'spiral') { const a = TAU * tau / 2 * turn, rr = R * (0.5 + 0.5 * u); return [rr * Math.cos(a), R * 0.9 * (u - 0.5), rr * Math.sin(a)]; } // flat loops that rise and widen over the phrase
-  if (fig === 'snake') return [R * 0.25 * Math.sin(TAU * tau / 8), R * 0.55 * Math.sin(Math.PI * tau), R * 0.6 * Math.sin(TAU * tau / 4) * turn]; // side to side on every beat
-  const a = TAU * tau / 4 * turn; return [R * 1.1 * Math.sin(a), R * 0.7 * Math.sin(a) * Math.cos(a), R * 0.3 * Math.cos(a)];            // figure 8 over 4 beats
+  if (fig === 'circle') { const a = TAU * tau / 8 * turn; return [R * Math.cos(a), R * 0.8 * Math.sin(a), R * 0.3 * Math.sin(a * 0.5)]; } // one wide loop per 8 counts
+  if (fig === 'spiral') { const a = TAU * tau / 6 * turn, rr = R * (0.55 + 0.45 * Math.sin(Math.PI * u)); return [rr * Math.cos(a), R * 0.7 * Math.sin(TAU * tau / 16), rr * Math.sin(a)]; } // flat loops that swell and settle
+  if (fig === 'snake') return [R * 0.35 * Math.sin(TAU * tau / 16), R * 0.6 * Math.sin(TAU * tau / 4), R * 0.7 * Math.sin(TAU * tau / 8) * turn]; // a slow wave
+  const a = TAU * tau / 8 * turn; return [R * 1.1 * Math.sin(a), R * 0.7 * Math.sin(a) * Math.cos(a), R * 0.4 * Math.cos(a)];  // figure 8 over 8 counts
 }
 const dvA = new THREE.Vector3(), dvB = new THREE.Vector3(), dvC = new THREE.Vector3(), dvD = new THREE.Vector3();
 function danceHead(g, d, T, out) {
   // position of the performer's hand (the ribbon's head) at time T, and the twist angle
   const p = g.p, S = g.stage, beat = 60 / p.bpm, B = T / beat + d.delay;
   const b = Math.floor(B), f = B - b, acc = Math.min(0.9, p.accent);
-  const tau = b + f + (acc / (2 * Math.PI)) * Math.sin(2 * Math.PI * f); // fastest on the beat, slowest between beats
+  const tau = b + f + (acc / (2 * Math.PI)) * Math.sin(2 * Math.PI * f); // accent 0 = an even, flowing pace
   const k = Math.floor(tau / 8), u = (tau - 8 * k) / 8;
   const A = i => S.areas[danceSeq(d, i).area];
   // travel between areas with a continuous Catmull-Rom path, one area per 8 counts
@@ -1009,17 +1009,16 @@ function danceHead(g, d, T, out) {
   out.set(cr(P0.x, P1.x, P2.x, P3.x), cr(P0.y, P1.y, P2.y, P3.y), cr(P0.z, P1.z, P2.z, P3.z));
   const R = S.R, cur = danceSeq(d, k), nxt = danceSeq(d, k + 1);
   const f1 = figureAt(cur.figure, tau, u, R, cur.turn), f2 = figureAt(nxt.figure, tau, 0, R, nxt.turn);
-  const w = THREE.MathUtils.smoothstep(u, 0.8, 1); // the last count blends into the next figure
+  const w = THREE.MathUtils.smootherstep(u, 0.4, 1); // the second half of each phrase eases into the next figure
   out.x += f1[0] * (1 - w) + f2[0] * w; out.y += f1[1] * (1 - w) + f2[1] * w; out.z += f1[2] * (1 - w) + f2[2] * w;
-  out.y -= R * 0.12 * Math.cos(2 * Math.PI * tau); // a small bend of the knees on every beat
   out.add(d.offset).add(S.o);
   // the body turns a quarter turn on every beat (× twist), so the ribbon rolls with it
-  return Math.PI * p.twist * tau * 0.25 * cur.turn;
+  return Math.PI * p.twist * tau * 0.25; // one steady direction, so the twist never jumps
 }
 function buildDance(g, base, W0) {
   const p = g.p, n = p.count, sp = p.spread;
   const areas = [];
-  for (let z = -1; z <= 1; z++) for (let x = -1; x <= 1; x++) areas.push(new THREE.Vector3(x * W0 * 0.62 * sp, z * W0 * 0.1 * sp, -z * W0 * 0.5 * sp)); // upstage sits a little higher and further back
+  for (let z = -1; z <= 1; z++) for (let x = -1; x <= 1; x++) areas.push(new THREE.Vector3(x * W0 * 0.42 * sp, z * W0 * 0.12 * sp, -z * W0 * 0.55 * sp)); // upstage sits a little higher and further back
   g.stage = { o: base.clone(), areas, R: W0 * 0.3 * p.amplitude };
   g.dancers = [];
   for (let i = 0; i < n; i++) {

@@ -112,7 +112,7 @@ export const CATEGORIES = [
     shape: { ko: '퍼포머 한 명이 남기는 한 가닥의 리본(선)', en: 'One ribbon of lines for each performer' },
     rule: { ko: '퍼포머가 박자에 맞춰 무대의 구역을 옮겨 다니며 춤추고, 몸이 지나간 자리가 꼬이는 리본으로 남는다', en: 'Performers dance to the beat, moving between areas of the stage; where the body passed stays as a twisting ribbon' },
     ref: { ko: '모션 캡처의 움직임 궤적(Ghostcatching), 로이 풀러의 서펜타인 댄스, 라반의 트레이스 폼, 커닝햄의 무대 공간', en: 'Motion-capture trails (Ghostcatching), Loïe Fuller’s Serpentine Dance, Laban’s trace forms, Cunningham’s stage space' },
-    defaults: { ...COMMON, count: 2, behaviour: 'canon', bpm: 96, accent: 0.6, amplitude: 1, twist: 1, spread: 1, ribbon: 5, ribbonWidth: 1, strands: 4, echoOpacity: 1, colorShift: 0.8, air: 0.5 },
+    defaults: { ...COMMON, count: 2, behaviour: 'canon', bpm: 84, accent: 0, amplitude: 1.2, twist: 0.6, spread: 1, ribbon: 5, ribbonWidth: 1, strands: 4, echoOpacity: 1, colorShift: 0.8, air: 0.5 },
   },
   {
     id: 'digital', motion: 'format', gradient: 'violet-magenta', camera: 'orbit',
