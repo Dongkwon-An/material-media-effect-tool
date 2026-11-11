@@ -958,20 +958,20 @@ function walkState(u, time, out) {
 
 /* ---------------------------------------------------------
    Performance: dance. Each performer is one ribbon of lines.
-   Why a line: a performance leaves no object behind, only the
-     path the body traced, so the performer is drawn as that trace.
-   Why this rhythm: the motion counts in beats (BPM) and 8-count
-     phrases, as dancers do; each beat has an accent: the ribbon
-     whips forward on the beat and glides between beats.
-   Why these places: the stage is split into nine areas (up/centre/
-     downstage × left/centre/right). Every 8 counts a performer
-     travels to another area, as in blocking a choreography.
-   Why these shapes: within a phrase the performer repeats one of
-     four basic ribbon-dance figures: circle, spiral, snake, figure 8.
-   Why it twists: the ribbon turns about its own length whenever the
-     performer turns, so a twist marks a turn of the body.
-   Several performers dance in unison, in canon (the same phrase a
-     couple of beats later) or each their own solo.
+   Why a line: when a dance is motion-captured, the body disappears and
+     only the paths of its movement remain as data (as in Ghostcatching,
+     Kaiser & Eshkar with Bill T. Jones, 1999). What a performance leaves
+     for the archive is that trace, so the performer is drawn as it.
+   Why a ribbon that twists: Loïe Fuller's Serpentine Dance (1891) turned a
+     dancer's spins into spiralling fabric under electric light, one of the
+     first media performances. Here a turn of the body rolls the ribbon.
+   Why these shapes: Rudolf Laban's trace forms, the basic paths a body
+     draws in its kinesphere: circle, spiral, wave, figure of eight.
+   Why these places: as in Merce Cunningham's work, the stage has no single
+     centre. It is split into nine areas and each 8-count phrase goes to an
+     area chosen by chance.
+   Why this rhythm: a performance follows a score; here the score counts in
+     beats (BPM) and 8-count phrases, with an accent on each beat.
    --------------------------------------------------------- */
 const FIGURES = ['circle', 'spiral', 'snake', 'eight'];
 function danceSeq(d, k) {
