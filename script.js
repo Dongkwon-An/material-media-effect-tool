@@ -2,8 +2,8 @@ import * as THREE from 'three';
 import { LineSegments2 } from 'three/addons/lines/LineSegments2.js';
 import { LineSegmentsGeometry } from 'three/addons/lines/LineSegmentsGeometry.js';
 import { LineMaterial } from 'three/addons/lines/LineMaterial.js';
-import * as BRAND from './brand.js?v=20261112a'; // ?v= makes the browser load fresh copies after an update
-import { I18N } from './i18n.js?v=20261112a';
+import * as BRAND from './brand.js?v=20261112b'; // ?v= makes the browser load fresh copies after an update
+import { I18N } from './i18n.js?v=20261112b';
 
 /* =========================================================
    State
@@ -1120,7 +1120,7 @@ function updateNeon(g, T) {
   // on a light background a white-hot core disappears, so the coloured light around it does the work:
   // a strong colour rim hugs the core and the glow is laid on thicker
   const light = bgCol.r * 0.3 + bgCol.g * 0.59 + bgCol.b * 0.11 > 0.6;
-  const glowK = light ? 2.4 : 1, coreWhite = light ? 0.8 : 0.55;
+  const glowK = light ? 1.5 : 1, coreWhite = light ? 0.8 : 0.55, spreadK = light ? 0.45 : 1; // on white the glow stays close to the tube
   g.glow.forEach(dynBegin); dynBegin(g.dTrail); dynBegin(g.rim);
   const Lh = Math.min(240, p.echoLength), dt = BRAND.ECHO.spacing / p.echoDensity;
   g.tubes.forEach(tb => {
@@ -1145,7 +1145,13 @@ function updateNeon(g, T) {
     nCol.copy(gcol(g, tb.hue * 0.5 * p.colorShift)); nCol2.copy(gcol(g, (tb.hue * 0.5 + 0.5) * p.colorShift));
     dynSeg(g.rim, 0, nP0, nP1, nCol, nCol2);
   });
-  GLOW_LAYERS.forEach((l, li) => { g.glow[li].alpha[0] = li === 0 ? l.a : Math.min(1, l.a * glow * glowK); });
+  GLOW_LAYERS.forEach((l, li) => {
+    g.glow[li].alpha[0] = li === 0 ? l.a : Math.min(1, l.a * glow * glowK);
+    if (li > 0) { // narrower glow on light backgrounds
+      const m = g.glow[li].layers[0].mesh.material, px = Math.max(8, l.px * spreadK);
+      if (m.userData.px !== px) { m.userData.px = px; m.linewidth = px * lineScale; }
+    }
+  });
   g.rim.alpha[0] = light ? Math.min(1, 0.9 * Math.max(0.3, glow)) : 0.5;
   for (let b = 0; b < 8; b++) g.dTrail.alpha[b] = Math.min(1, 0.6 * Math.pow(1 - b / 8, 1.1) * p.echoOpacity);
   g.glow.forEach(dynEnd); dynEnd(g.rim); dynEnd(g.dTrail);
