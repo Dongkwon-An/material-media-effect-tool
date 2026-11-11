@@ -2,8 +2,8 @@ import * as THREE from 'three';
 import { LineSegments2 } from 'three/addons/lines/LineSegments2.js';
 import { LineSegmentsGeometry } from 'three/addons/lines/LineSegmentsGeometry.js';
 import { LineMaterial } from 'three/addons/lines/LineMaterial.js';
-import * as BRAND from './brand.js?v=20261111c'; // ?v= makes the browser load fresh copies after an update
-import { I18N } from './i18n.js?v=20261111c';
+import * as BRAND from './brand.js?v=20261111e'; // ?v= makes the browser load fresh copies after an update
+import { I18N } from './i18n.js?v=20261111e';
 
 /* =========================================================
    State
@@ -1040,17 +1040,10 @@ function updateDance(g, T) {
     const roll = [];
     for (let k = 0; k <= L; k++) roll.push(danceHead(g, d, T - k * dt, rbP[k]));
     for (let k = 0; k <= L; k++) {
-      rbT.copy(rbP[Math.max(0, k - 1)]).sub(rbP[Math.min(L, k + 1)]);
-      if (rbT.lengthSq() < 1e-10) rbT.set(1, 0, 0);
-      rbT.normalize();
-      // carry the ribbon's side direction along the path (no sudden flips), then roll it by the twist
-      if (k === 0) rbUp.copy(Math.abs(rbT.y) < 0.9 ? rbY : rbX); else rbUp.copy(rbN);
-      rbN.copy(rbUp).addScaledVector(rbT, -rbT.dot(rbUp));
-      if (rbN.lengthSq() < 1e-10) rbN.copy(Math.abs(rbT.y) < 0.9 ? rbY : rbX).addScaledVector(rbT, -rbT.dot(Math.abs(rbT.y) < 0.9 ? rbY : rbX));
-      rbN.normalize();
-      rbB.crossVectors(rbT, rbN);
-      const age = k / L, taper = Math.min(1, (1 - age) * 5) * Math.min(1, 0.35 + age * 6);
-      rbW[k].copy(rbN).multiplyScalar(Math.cos(roll[k])).addScaledVector(rbB, Math.sin(roll[k])).multiplyScalar(half * taper);
+      // the ribbon's width follows the turning of the body over time (the roll), not the bends of
+      // the path, so it never flips when the path loops back on itself
+      const age = k / L, taper = Math.min(1, (1 - age) * 5) * Math.min(1, 0.35 + age * 6), r = roll[k];
+      rbW[k].copy(rbY).multiplyScalar(Math.cos(r)).addScaledVector(rbB.set(0.8, 0, 0.6), Math.sin(r)).multiplyScalar(half * taper);
     }
     for (let k = 0; k < L; k++) {
       const age = k / L, bk = Math.min(7, Math.floor(age * 8));
@@ -1595,5 +1588,5 @@ requestAnimationFrame(loop);
 window.__mm = {
   state, toggleCategory, setCat, setGlobal,
   get clock() { return clock; }, set clock(v) { clock = v; },
-  pause() { playing = false; updatePlayIcon(); }, exportSVG,
+  pause() { playing = false; updatePlayIcon(); }, exportSVG, get groups() { return groups; }, renderFrame,
 };
