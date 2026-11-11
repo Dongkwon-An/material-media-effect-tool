@@ -2,8 +2,8 @@ import * as THREE from 'three';
 import { LineSegments2 } from 'three/addons/lines/LineSegments2.js';
 import { LineSegmentsGeometry } from 'three/addons/lines/LineSegmentsGeometry.js';
 import { LineMaterial } from 'three/addons/lines/LineMaterial.js';
-import * as BRAND from './brand.js?v=20261111e'; // ?v= makes the browser load fresh copies after an update
-import { I18N } from './i18n.js?v=20261111e';
+import * as BRAND from './brand.js?v=20261111f'; // ?v= makes the browser load fresh copies after an update
+import { I18N } from './i18n.js?v=20261111f';
 
 /* =========================================================
    State
@@ -74,7 +74,7 @@ const R = {
   performerSpacing: { k: 'spacing', c: true, type: 'range', label: 'performerSpacing', min: 0.3, max: 2, step: 0.05, unit: '×' },
   amplitude: { k: 'amplitude', c: true, type: 'range', label: 'swingRange', min: 0, max: 1.8, step: 0.05, unit: '×' },
   stepTime: { k: 'duration', c: true, type: 'range', label: 'stepTime', min: 0.4, max: 4, step: 0.05, unit: 's' },
-  together: { k: 'behaviour', c: true, type: 'select', label: 'together', opts: [['canon', 'canon'], ['unison', 'unison'], ['mirror', 'mirror']] },
+  together: { k: 'behaviour', c: true, type: 'select', label: 'mode', opts: [['canon', 'canon'], ['unison', 'unison'], ['mirror', 'mirror']] },
   bpm: { k: 'bpm', c: true, type: 'range', label: 'bpm', min: 60, max: 160, step: 1 },
   accent: { k: 'accent', c: true, type: 'range', label: 'accent', min: 0, max: 0.9, step: 0.01 },
   figureSize: { k: 'amplitude', c: true, type: 'range', label: 'figureSize', min: 0.3, max: 2, step: 0.05, unit: '×' },
@@ -977,14 +977,17 @@ const FIGURES = ['circle', 'spiral', 'snake', 'eight'];
 // and at each place always the same figure. 32 counts make one round, then it repeats.
 //   front → circle   right → spiral   back → wave   left → figure 8
 const SCORE = [{ area: 0, figure: 'circle' }, { area: 1, figure: 'spiral' }, { area: 2, figure: 'snake' }, { area: 3, figure: 'eight' }];
-function danceSeq(d, k) { const s = SCORE[((k % 4) + 4) % 4]; return { area: s.area, figure: s.figure, turn: 1 }; }
-function figureAt(fig, tau, u, R, turn) {
+const SCORE_TURN = SCORE.map(x => ({ area: x.area, figure: x.figure, turn: 1 }));
+function danceSeq(d, k) { return SCORE_TURN[((k % 4) + 4) % 4]; }
+const FIG1 = [0, 0, 0], FIG2 = [0, 0, 0];
+const setF = (o, x, y, z) => { o[0] = x; o[1] = y; o[2] = z; return o; };
+function figureAt(fig, tau, u, R, turn, o) {
   // the four basic figures; slow, long loops so the ribbon flows instead of jerking
   const TAU = Math.PI * 2;
-  if (fig === 'circle') { const a = TAU * tau / 8 * turn; return [R * Math.cos(a), R * 0.8 * Math.sin(a), R * 0.3 * Math.sin(a * 0.5)]; } // one wide loop per 8 counts
-  if (fig === 'spiral') { const a = TAU * tau / 6 * turn, rr = R * (0.55 + 0.45 * Math.sin(Math.PI * u)); return [rr * Math.cos(a), R * 0.7 * Math.sin(TAU * tau / 16), rr * Math.sin(a)]; } // flat loops that swell and settle
-  if (fig === 'snake') return [R * 0.35 * Math.sin(TAU * tau / 16), R * 0.6 * Math.sin(TAU * tau / 4), R * 0.7 * Math.sin(TAU * tau / 8) * turn]; // a slow wave
-  const a = TAU * tau / 8 * turn; return [R * 1.1 * Math.sin(a), R * 0.7 * Math.sin(a) * Math.cos(a), R * 0.4 * Math.cos(a)];  // figure 8 over 8 counts
+  if (fig === 'circle') { const a = TAU * tau / 8 * turn; return setF(o, R * Math.cos(a), R * 0.8 * Math.sin(a), R * 0.3 * Math.sin(a * 0.5)); } // one wide loop per 8 counts
+  if (fig === 'spiral') { const a = TAU * tau / 6 * turn, rr = R * (0.55 + 0.45 * Math.sin(Math.PI * u)); return setF(o, rr * Math.cos(a), R * 0.7 * Math.sin(TAU * tau / 16), rr * Math.sin(a)); } // flat loops that swell and settle
+  if (fig === 'snake') return setF(o, R * 0.35 * Math.sin(TAU * tau / 16), R * 0.6 * Math.sin(TAU * tau / 4), R * 0.7 * Math.sin(TAU * tau / 8) * turn); // a slow wave
+  const a = TAU * tau / 8 * turn; return setF(o, R * 1.1 * Math.sin(a), R * 0.7 * Math.sin(a) * Math.cos(a), R * 0.4 * Math.cos(a));  // figure 8 over 8 counts
 }
 const dvA = new THREE.Vector3(), dvB = new THREE.Vector3(), dvC = new THREE.Vector3(), dvD = new THREE.Vector3();
 function danceHead(g, d, T, out) {
@@ -999,7 +1002,7 @@ function danceHead(g, d, T, out) {
   const cr = (a, b2, c, dd) => 0.5 * (2 * b2 + (-a + c) * e + (2 * a - 5 * b2 + 4 * c - dd) * e * e + (-a + 3 * b2 - 3 * c + dd) * e * e * e);
   out.set(cr(P0.x, P1.x, P2.x, P3.x), cr(P0.y, P1.y, P2.y, P3.y), cr(P0.z, P1.z, P2.z, P3.z));
   const R = S.R, cur = danceSeq(d, k), nxt = danceSeq(d, k + 1);
-  const f1 = figureAt(cur.figure, tau, u, R, cur.turn), f2 = figureAt(nxt.figure, tau, 0, R, nxt.turn);
+  const f1 = figureAt(cur.figure, tau, u, R, cur.turn, FIG1), f2 = figureAt(nxt.figure, tau, 0, R, nxt.turn, FIG2);
   const w = THREE.MathUtils.smootherstep(u, 0.4, 1); // the second half of each phrase eases into the next figure
   out.x += f1[0] * (1 - w) + f2[0] * w; out.y += f1[1] * (1 - w) + f2[1] * w; out.z += f1[2] * (1 - w) + f2[2] * w;
   out.x *= d.mirror;
@@ -1023,31 +1026,33 @@ function buildDance(g, base, W0) {
     g.dancers.push({ delay, offset, mirror: mode === 'mirror' && i % 2 === 1 ? -1 : 1, hue: n > 1 ? i / (n - 1) : 0 });
   }
   const maxS = 2 + Math.round(p.strands);
-  g.dEdge = makeDyn(g, BRAND.LINE.px, n * 2 * 400 + 8, 8, 2);
-  g.dInner = makeDyn(g, BRAND.LINE.linkPx, n * maxS * 400 + 8, 8, 1);
+  // one opacity per layer: the ribbon fades by colour (toward the background), not in steps, so it never looks chopped
+  g.dEdge = makeDyn(g, BRAND.LINE.px, n * 2 * 400 + 8, 1, 2);
+  g.dInner = makeDyn(g, BRAND.LINE.linkPx, n * maxS * 400 + 8, 1, 1);
   g.update = updateDance;
 }
 const rbP = [], rbW = [];
 for (let i = 0; i < 402; i++) { rbP.push(new THREE.Vector3()); rbW.push(new THREE.Vector3()); }
 const rbT = new THREE.Vector3(), rbN = new THREE.Vector3(), rbB = new THREE.Vector3(), rbUp = new THREE.Vector3(), rbX = new THREE.Vector3(1, 0, 0), rbY = new THREE.Vector3(0, 1, 0);
-const rbQ1 = new THREE.Vector3(), rbQ2 = new THREE.Vector3();
+const rbQ1 = new THREE.Vector3(), rbQ2 = new THREE.Vector3(), rbRoll = new Float64Array(402);
 function updateDance(g, T) {
   const p = g.p, beat = 60 / p.bpm, L = Math.min(400, Math.max(8, Math.round((p.ribbon * beat) / 0.012)));
   const dt = (p.ribbon * beat) / L, half = g.stage.R * 0.32 * p.ribbonWidth, m = Math.max(1, Math.round(p.strands));
   [g.dEdge, g.dInner].forEach(dynBegin);
   g.dancers.forEach(d => {
     // sample the path behind the head, and a twisting width vector at each point
-    const roll = [];
-    for (let k = 0; k <= L; k++) roll.push(danceHead(g, d, T - k * dt, rbP[k]));
+    const roll = rbRoll;
+    for (let k = 0; k <= L; k++) roll[k] = danceHead(g, d, T - k * dt, rbP[k]);
     for (let k = 0; k <= L; k++) {
       // the ribbon's width follows the turning of the body over time (the roll), not the bends of
       // the path, so it never flips when the path loops back on itself
       const age = k / L, taper = Math.min(1, (1 - age) * 5) * Math.min(1, 0.35 + age * 6), r = roll[k];
       rbW[k].copy(rbY).multiplyScalar(Math.cos(r)).addScaledVector(rbB.set(0.8, 0, 0.6), Math.sin(r)).multiplyScalar(half * taper);
     }
-    for (let k = 0; k < L; k++) {
-      const age = k / L, bk = Math.min(7, Math.floor(age * 8));
-      const c = airy(gcol(g, age * p.colorShift * 0.8 + d.hue * 0.25), (p.air ?? 0) * Math.pow(age, 1.3));
+    for (let k = L - 1; k >= 0; k--) { // tail first, so the bright head is drawn on top
+      const age = k / L, bk = 0;
+      const fade = Math.min(0.97, Math.pow(age, 1.1) / Math.max(0.3, p.echoOpacity) * (0.6 + 0.4 * (p.air ?? 0.5)));
+      const c = airy(gcol(g, age * p.colorShift * 0.8 + d.hue * 0.25), fade);
       for (let j = -m; j <= m; j++) {
         const s = j / m;
         rbQ1.copy(rbP[k]).addScaledVector(rbW[k], s);
@@ -1056,11 +1061,7 @@ function updateDance(g, T) {
       }
     }
   });
-  for (let b = 0; b < 8; b++) {
-    const a = Math.pow(1 - b / 8, 0.8) * p.echoOpacity;
-    g.dEdge.alpha[b] = Math.min(1, 0.95 * a);
-    g.dInner.alpha[b] = Math.min(1, 0.45 * a);
-  }
+  g.dEdge.alpha[0] = 0.95; g.dInner.alpha[0] = 0.55;
   [g.dEdge, g.dInner].forEach(dynEnd);
 }
 
