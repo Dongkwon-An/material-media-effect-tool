@@ -2,8 +2,8 @@ import * as THREE from 'three';
 import { LineSegments2 } from 'three/addons/lines/LineSegments2.js';
 import { LineSegmentsGeometry } from 'three/addons/lines/LineSegmentsGeometry.js';
 import { LineMaterial } from 'three/addons/lines/LineMaterial.js';
-import * as BRAND from './brand.js?v=20261111b'; // ?v= makes the browser load fresh copies after an update
-import { I18N } from './i18n.js?v=20261111b';
+import * as BRAND from './brand.js?v=20261111c'; // ?v= makes the browser load fresh copies after an update
+import { I18N } from './i18n.js?v=20261111c';
 
 /* =========================================================
    State
@@ -74,7 +74,7 @@ const R = {
   performerSpacing: { k: 'spacing', c: true, type: 'range', label: 'performerSpacing', min: 0.3, max: 2, step: 0.05, unit: '×' },
   amplitude: { k: 'amplitude', c: true, type: 'range', label: 'swingRange', min: 0, max: 1.8, step: 0.05, unit: '×' },
   stepTime: { k: 'duration', c: true, type: 'range', label: 'stepTime', min: 0.4, max: 4, step: 0.05, unit: 's' },
-  together: { k: 'behaviour', c: true, type: 'select', label: 'together', opts: [['canon', 'canon'], ['unison', 'unison'], ['free', 'solo']] },
+  together: { k: 'behaviour', c: true, type: 'select', label: 'together', opts: [['canon', 'canon'], ['unison', 'unison'], ['mirror', 'mirror']] },
   bpm: { k: 'bpm', c: true, type: 'range', label: 'bpm', min: 60, max: 160, step: 1 },
   accent: { k: 'accent', c: true, type: 'range', label: 'accent', min: 0, max: 0.9, step: 0.01 },
   figureSize: { k: 'amplitude', c: true, type: 'range', label: 'figureSize', min: 0.3, max: 2, step: 0.05, unit: '×' },
@@ -967,26 +967,17 @@ function walkState(u, time, out) {
      first media performances. Here a turn of the body rolls the ribbon.
    Why these shapes: Rudolf Laban's trace forms, the basic paths a body
      draws in its kinesphere: circle, spiral, wave, figure of eight.
-   Why these places: as in Merce Cunningham's work, the stage has no single
-     centre. It is split into nine areas and each 8-count phrase goes to an
-     area chosen by chance.
+   Why these places: the score walks the stage clockwise through four places
+     (front, right, back, left), one 8-count phrase at each.
    Why this rhythm: a performance follows a score; here the score counts in
      beats (BPM) and 8-count phrases, with an accent on each beat.
    --------------------------------------------------------- */
 const FIGURES = ['circle', 'spiral', 'snake', 'eight'];
-function danceSeq(d, k) {
-  // stage area and figure for phrase k (one 8-count); depends only on k, so every frame agrees
-  const cache = d.cache;
-  if (cache.has(k)) return cache.get(k);
-  const raw = i => { const r = rng(d.seed + i * 7919); return [r(), r(), r(), r()]; };
-  const [a, f, t, j] = raw(k), prevA = Math.floor(raw(k - 1)[0] * 9);
-  let area = Math.floor(a * 9);
-  if (area === prevA) area = (area + 1 + Math.floor(j * 8)) % 9; // always move to another area
-  const v = { area, figure: FIGURES[Math.floor(f * FIGURES.length)], turn: t < 0.5 ? 1 : -1 };
-  cache.set(k, v);
-  if (cache.size > 200) cache.delete(cache.keys().next().value);
-  return v;
-}
+// The score: four places on the stage, visited in a fixed clockwise order, one 8-count each,
+// and at each place always the same figure. 32 counts make one round, then it repeats.
+//   front → circle   right → spiral   back → wave   left → figure 8
+const SCORE = [{ area: 0, figure: 'circle' }, { area: 1, figure: 'spiral' }, { area: 2, figure: 'snake' }, { area: 3, figure: 'eight' }];
+function danceSeq(d, k) { const s = SCORE[((k % 4) + 4) % 4]; return { area: s.area, figure: s.figure, turn: 1 }; }
 function figureAt(fig, tau, u, R, turn) {
   // the four basic figures; slow, long loops so the ribbon flows instead of jerking
   const TAU = Math.PI * 2;
@@ -1011,22 +1002,25 @@ function danceHead(g, d, T, out) {
   const f1 = figureAt(cur.figure, tau, u, R, cur.turn), f2 = figureAt(nxt.figure, tau, 0, R, nxt.turn);
   const w = THREE.MathUtils.smootherstep(u, 0.4, 1); // the second half of each phrase eases into the next figure
   out.x += f1[0] * (1 - w) + f2[0] * w; out.y += f1[1] * (1 - w) + f2[1] * w; out.z += f1[2] * (1 - w) + f2[2] * w;
+  out.x *= d.mirror;
   out.add(d.offset).add(S.o);
   // the body turns a quarter turn on every beat (× twist), so the ribbon rolls with it
   return Math.PI * p.twist * tau * 0.25; // one steady direction, so the twist never jumps
 }
 function buildDance(g, base, W0) {
   const p = g.p, n = p.count, sp = p.spread;
-  const areas = [];
-  for (let z = -1; z <= 1; z++) for (let x = -1; x <= 1; x++) areas.push(new THREE.Vector3(x * W0 * 0.42 * sp, z * W0 * 0.12 * sp, -z * W0 * 0.55 * sp)); // upstage sits a little higher and further back
+  // four places around the centre of the stage: front, right, back, left
+  const areas = [new THREE.Vector3(0, -W0 * 0.08 * sp, W0 * 0.45 * sp), new THREE.Vector3(W0 * 0.48 * sp, 0, 0), new THREE.Vector3(0, W0 * 0.08 * sp, -W0 * 0.45 * sp), new THREE.Vector3(-W0 * 0.48 * sp, 0, 0)];
   g.stage = { o: base.clone(), areas, R: W0 * 0.3 * p.amplitude };
   g.dancers = [];
   for (let i = 0; i < n; i++) {
     const mode = p.behaviour;
-    const seed = mode === 'free' ? 3100 + i * 977 : 3100;
-    const delay = mode === 'canon' ? -i * 2 : mode === 'free' ? i * 3 : 0; // canon: two beats behind the one before
-    const offset = mode === 'unison' ? new THREE.Vector3((i - (n - 1) / 2) * W0 * 0.28, 0, (i % 2) * W0 * 0.1) : new THREE.Vector3();
-    g.dancers.push({ seed, delay, offset, cache: new Map(), hue: n > 1 ? i / (n - 1) : 0 });
+    // canon: each performer starts one place (8 counts) later, so four performers fill all four places at once
+    // unison: everyone dances the same score side by side
+    // mirror: every second performer dances the score left-right reversed
+    const delay = mode === 'canon' ? -i * 8 : 0;
+    const offset = mode === 'unison' ? new THREE.Vector3((i - (n - 1) / 2) * W0 * 0.25, 0, 0) : mode === 'mirror' ? new THREE.Vector3(0, 0, (Math.floor(i / 2)) * -W0 * 0.2) : new THREE.Vector3();
+    g.dancers.push({ delay, offset, mirror: mode === 'mirror' && i % 2 === 1 ? -1 : 1, hue: n > 1 ? i / (n - 1) : 0 });
   }
   const maxS = 2 + Math.round(p.strands);
   g.dEdge = makeDyn(g, BRAND.LINE.px, n * 2 * 400 + 8, 8, 2);
