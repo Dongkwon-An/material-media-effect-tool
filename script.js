@@ -2,8 +2,8 @@ import * as THREE from 'three';
 import { LineSegments2 } from 'three/addons/lines/LineSegments2.js';
 import { LineSegmentsGeometry } from 'three/addons/lines/LineSegmentsGeometry.js';
 import { LineMaterial } from 'three/addons/lines/LineMaterial.js';
-import * as BRAND from './brand.js?v=20261112f'; // ?v= makes the browser load fresh copies after an update
-import { I18N } from './i18n.js?v=20261112f';
+import * as BRAND from './brand.js?v=20261112g'; // ?v= makes the browser load fresh copies after an update
+import { I18N } from './i18n.js?v=20261112g';
 
 /* =========================================================
    State
@@ -72,7 +72,7 @@ const R = {
   voxel: { k: 'voxel', c: true, type: 'check', label: 'voxel' },
   gridSize: { k: 'size', c: true, type: 'range', label: 'gridSize', min: 0.5, max: 1.6, step: 0.05, unit: '×' },
   pixels: { k: 'cols', c: true, type: 'range', label: 'pixels', min: 6, max: 40, step: 1 },
-  transition: { k: 'transition', c: true, type: 'select', label: 'transition', opts: [['wave', 'trWave'], ['blocks', 'trBlocks']] },
+  transition: { k: 'transition', c: true, type: 'select', label: 'transition', opts: [['wave', 'trWave'], ['radial', 'trRadial']] },
   hold: { k: 'hold', c: true, type: 'range', label: 'hold', min: 0.3, max: 5, step: 0.1, unit: 's' },
   pixelSize: { k: 'size', c: true, type: 'range', label: 'pixelSize', min: 0.5, max: 2, step: 0.05, unit: '×' },
   // performance
@@ -1205,20 +1205,18 @@ function updateSubpix(g, T) {
   const MAXC = 160;
   if (i1 - i0 > MAXC) { const m = (i0 + i1) >> 1; i0 = m - MAXC / 2; i1 = m + MAXC / 2; }
   if (j1 - j0 > MAXC) { const m = (j0 + j1) >> 1; j0 = m - MAXC / 2; j1 = m + MAXC / 2; }
-  const tones = [0, 0.5, 1].map(t => t * p.colorShift), blocks = p.transition === 'blocks';
+  const tones = [0, 0.5, 1].map(t => t * p.colorShift), radial = p.transition === 'radial', RAD = stageDims().Hs * 0.85;
   dynBegin(g.dCells);
   for (let j = j0; j <= j1; j++) for (let i = i0; i <= i1; i++) {
     L.shift(i, j, spSh);
     const x = S.o.x + i * L.dx + spSh[0], y = S.o.y + j * L.dy + spSh[1], z = S.o.z;
     let s;
-    if (blocks) {
-      // blocks: the screen drops out piece by piece (whole blocks at once), and the next layout comes back the same way;
-      // while it holds, a few blocks blink off and on again, like a screen losing parts of its picture
-      const bi = Math.floor(i / 4), bj = Math.floor(j / 3), h = seeded(bi * 13.1 + bj * 71.7 + n * 5.3), h2 = seeded(bi * 37.3 + bj * 11.9 + n * 2.7);
-      const dlb = mv * 0.5 * h, pop = mv * 0.5; // each block shrinks and grows smoothly, not in a blink
-      const grow = ease(clamp01((local - dlb) / pop)), shrink = ease(clamp01((local - (W - mv) - dlb) / pop));
+    if (radial) {
+      // radial: the layout shrinks away from the centre outward, then the next one grows back from the edges inward
+      const r = clamp01(Math.hypot(x - S.o.x, y - S.o.y) / RAD);
+      const out = mv * 0.5 * r, inn = mv * 0.5 * (1 - r), run2 = mv * 0.5;
+      const grow = ease(clamp01((local - inn) / run2)), shrink = ease(clamp01((local - (W - mv) - out) / run2));
       s = grow * (1 - shrink);
-      if (h2 < 0.35) { const fd = hold * 0.18, t0 = mv + hold * (0.05 + 0.45 * seeded(bi * 5.1 + bj * 3.3 + n)), d = hold * 0.15; s *= 1 - ease(clamp01((local - t0) / fd)) * (1 - ease(clamp01((local - t0 - fd - d) / fd))); } // shrink away, wait, grow back
     } else {
       // wave: each element waits its turn in a soft wave that rolls across the screen
       const dl = stg * (0.5 + 0.5 * Math.sin(x * 0.35 + y * 0.22));
