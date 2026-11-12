@@ -2,8 +2,8 @@ import * as THREE from 'three';
 import { LineSegments2 } from 'three/addons/lines/LineSegments2.js';
 import { LineSegmentsGeometry } from 'three/addons/lines/LineSegmentsGeometry.js';
 import { LineMaterial } from 'three/addons/lines/LineMaterial.js';
-import * as BRAND from './brand.js?v=20261112r'; // ?v= makes the browser load fresh copies after an update
-import { I18N } from './i18n.js?v=20261112r';
+import * as BRAND from './brand.js?v=20261112s'; // ?v= makes the browser load fresh copies after an update
+import { I18N } from './i18n.js?v=20261112s';
 
 /* =========================================================
    State
@@ -760,13 +760,23 @@ function visibleNodes(g) {
   return out;
 }
 /* Once every cycle the whole field locks into a full grid: every arm reaches its neighbour and
-   every turned cross squares up. It holds for 2 s, then the signals take over again. */
-const NET_GRID = { every: 12, first: 6, ramp: 0.8, hold: 2 };
-function gridAmt(T) {
+   every turned cross squares up. The grid spreads out softly from one point like a ripple,
+   holds complete for 2 s, then lets go in the same order and the signals take over again. */
+const NET_GRID = { every: 14, first: 5, ramp: 1.8, spread: 1.6, hold: 2 };
+function gridSpan() { const G = NET_GRID; return G.spread + G.ramp; } // time for the whole field to finish joining
+function gridAmt(T) { // whole-field envelope (used to clear the trails)
   const G = NET_GRID, x = T - G.first;
   if (x < 0) return 0;
-  const t = x % G.every, S = THREE.MathUtils.smootherstep;
-  return S(t, 0, G.ramp) * (1 - S(t, G.ramp + G.hold, G.ramp * 2 + G.hold));
+  const t = x % G.every, S = THREE.MathUtils.smootherstep, J = gridSpan();
+  return S(t, 0, J) * (1 - S(t, J + G.hold, J * 2 + G.hold));
+}
+function gridAmtAt(g, T, nd) { // per cross: starts later the further it sits from the ripple's centre
+  const G = NET_GRID, x = T - G.first;
+  if (x < 0) return 0;
+  const C = g.cross, t = x % G.every, S = THREE.MathUtils.smootherstep, J = gridSpan();
+  const r = Math.hypot(tor(nd.gx, C.nx / 2, C.nx), tor(nd.gy, C.ny / 2, C.ny), tor(nd.gz, C.nz / 2, C.nz)) / Math.max(1, Math.hypot(C.nx, C.ny, C.nz) / 2);
+  const dl = Math.min(1, r) * G.spread;
+  return S(t, dl, dl + G.ramp) * (1 - S(t, J + G.hold + dl, J + G.hold + dl + G.ramp));
 }
 function crossesAt(g, nodes, T, d, alpha) {
   const p = g.p, C = g.cross, half = C.cell / 2, base = p.gap * half;
@@ -774,7 +784,7 @@ function crossesAt(g, nodes, T, d, alpha) {
   nodes.forEach(nd => {
     const b = fogB(alpha * nd.fog);
     if (b < 0) return;
-    const G = gridAmt(T);
+    const G = gridAmtAt(g, T, nd);
     const L = [0, 1, 2].map(a => { const l = len(waveField(g, nd.gx, nd.gy, nd.gz, T, a)); return l + (half - l) * G; });
     let ang = 0;
     // turning crosses step an eighth of a turn (45°) and hold: square → diagonal → square …
