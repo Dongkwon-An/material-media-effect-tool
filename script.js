@@ -2,8 +2,8 @@ import * as THREE from 'three';
 import { LineSegments2 } from 'three/addons/lines/LineSegments2.js';
 import { LineSegmentsGeometry } from 'three/addons/lines/LineSegmentsGeometry.js';
 import { LineMaterial } from 'three/addons/lines/LineMaterial.js';
-import * as BRAND from './brand.js?v=20261112o'; // ?v= makes the browser load fresh copies after an update
-import { I18N } from './i18n.js?v=20261112o';
+import * as BRAND from './brand.js?v=20261112p'; // ?v= makes the browser load fresh copies after an update
+import { I18N } from './i18n.js?v=20261112p';
 
 /* =========================================================
    State
@@ -135,7 +135,7 @@ const MOTION_GROUPS = {
     { key: 'echoes', desc: 'descHistory', rows: [R.history, R.layerDepth, R.echoOpacity, R.colorShift, R.air, R.thickness] },
   ],
   net: [
-    { key: 'motion', desc: 'descNet', rows: [R.crossCols, R.spread, R.gap, R.packets, R.waveTime, R.turnRate, R.jointSize] },
+    { key: 'motion', desc: 'descNet', rows: [R.crossCols, R.spread, R.gap, R.packets, R.waveTime, R.turnRate] },
     { key: 'echoes', desc: 'descEchoes', rows: [R.echoLength, R.echoDensity, R.echoOpacity, R.colorShift, R.air, R.thickness] },
   ],
   neon: [
@@ -179,7 +179,7 @@ const GLOBAL_SECTIONS = [
   ] },
 ];
 const CAMERA_KEYS = new Set(['camera', 'camDist', 'returnFront', 'panX', 'panY']);
-const LIVE_CAT_KEYS = new Set(['echoDensity', 'echoOpacity', 'colorShift', 'distanceFade', 'echoLength', 'reverse', 'lineColor', 'history', 'layerDepth', 'air', 'glow', 'hold', 'transition', 'jointSize', 'bpm', 'accent', 'twist', 'ribbon', 'ribbonWidth', 'cropMarks', 'tick', 'gap', 'turnRate']);
+const LIVE_CAT_KEYS = new Set(['echoDensity', 'echoOpacity', 'colorShift', 'distanceFade', 'echoLength', 'reverse', 'lineColor', 'history', 'layerDepth', 'air', 'glow', 'hold', 'transition', 'bpm', 'accent', 'twist', 'ribbon', 'ribbonWidth', 'cropMarks', 'tick', 'gap', 'turnRate']);
 
 /* =========================================================
    Sidebar rendering
@@ -688,7 +688,6 @@ function buildNet(g, base, W0) {
   const nx = Math.max(2, Math.round(ny * 1.6)), nz = ny;
   g.cross = { cell, nx, ny, nz, ctr: new THREE.Vector3(0, 0, 0).lerp(base, 0.25), frustum: new THREE.Frustum(), m4: new THREE.Matrix4(), sph: new THREE.Sphere() };
   g.dArms = fogDyn(g, BRAND.LINE.px, 26000, 1);
-  g.joints = makeJoints(g, 6000);
   g.update = updateNet;
 }
 /* Joints: where two arms meet and a link is complete, a small round dot appears.
@@ -813,17 +812,9 @@ function updateNet(g, T) {
   const p = g.p, Lh = Math.min(6, Math.round(p.echoLength)), dt = BRAND.ECHO.spacing * 2 / p.echoDensity;
   const nodes = visibleNodes(g).sort((a, b) => a.fog - b.fog); // far ones first
   dynBegin(g.dArms);
-  const J = g.joints;
-  J.n = 0;
-  const ck = `${p.reverse}|${p.lineColor}|${p.colorShift}`; // refresh the two dot colours when the colours change
-  if (J.colKey !== ck) { J.colKey = ck; const [cA, cB] = jointColours(g), u = J.pts.material.uniforms; u.uA.value.copy(cA); u.uB.value.copy(cB); }
   for (let k = Lh; k >= 1; k--) crossesAt(g, nodes, T - k * dt, g.dArms, 0.16 * (1 - (k - 1) / Lh) * p.echoOpacity);
   crossesAt(g, nodes, T, g.dArms, 0.95);
   dynEnd(g.dArms);
-  J.pts.material.uniforms.uScale.value = (renderH * renderPR * 0.5) / Math.tan(THREE.MathUtils.degToRad(FOV / 2));
-  J.pts.material.uniforms.uMax.value = 20 * lineScale * (p.jointSize ?? 1); // dots close to the camera never grow huge
-  ['position', 'aSize', 'aAlpha', 'aPick'].forEach(k => { J.geo.attributes[k].needsUpdate = true; });
-  J.geo.setDrawRange(0, J.n);
 }
 
 /* ---------------------------------------------------------
