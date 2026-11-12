@@ -2,8 +2,8 @@ import * as THREE from 'three';
 import { LineSegments2 } from 'three/addons/lines/LineSegments2.js';
 import { LineSegmentsGeometry } from 'three/addons/lines/LineSegmentsGeometry.js';
 import { LineMaterial } from 'three/addons/lines/LineMaterial.js';
-import * as BRAND from './brand.js?v=20261112q'; // ?v= makes the browser load fresh copies after an update
-import { I18N } from './i18n.js?v=20261112q';
+import * as BRAND from './brand.js?v=20261112r'; // ?v= makes the browser load fresh copies after an update
+import { I18N } from './i18n.js?v=20261112r';
 
 /* =========================================================
    State
@@ -789,12 +789,7 @@ function crossesAt(g, nodes, T, d, alpha) {
     nC.set(nd.x, nd.y, nd.z);
     // how diagonal the cross is right now: 0 square to the grid, 1 at 45°
     const m = ang / (Math.PI / 4), diag = nd.turns ? Math.abs(Math.sin(ang * 2)) : 0, D = Math.SQRT2 * C.cell;
-    // while turned, the two arms in the turning plane reach out to the diagonal neighbours' centres, so the cross stays linked
-    const Lx = [0, 1, 2].map(a => {
-      if (a === nd.axis || diag <= 0) return L[a];
-      const kk = clamp01((L[a] - base) / Math.max(1e-6, half - base));
-      return L[a] + kk * (D - half) * diag;
-    });
+    const Lx = L; // turned crosses keep their own arm length: they do not link diagonally
     for (let a = 0; a < 3; a++) for (const sg of [1, -1]) { nE.copy(nC).addScaledVector(AX[a], sg * Lx[a]); dynSeg(d, b, nC, nE, c); }
     if (!g.joints || alpha <= 0.5) return;
     const js = C.cell * 0.1 * (p.jointSize ?? 1);
