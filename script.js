@@ -2,8 +2,8 @@ import * as THREE from 'three';
 import { LineSegments2 } from 'three/addons/lines/LineSegments2.js';
 import { LineSegmentsGeometry } from 'three/addons/lines/LineSegmentsGeometry.js';
 import { LineMaterial } from 'three/addons/lines/LineMaterial.js';
-import * as BRAND from './brand.js?v=20261112b'; // ?v= makes the browser load fresh copies after an update
-import { I18N } from './i18n.js?v=20261112b';
+import * as BRAND from './brand.js?v=20261112c'; // ?v= makes the browser load fresh copies after an update
+import { I18N } from './i18n.js?v=20261112c';
 
 /* =========================================================
    State
@@ -71,6 +71,9 @@ const R = {
   layerDepth: { k: 'layerDepth', c: true, type: 'range', label: 'layerDepth', min: 0, max: 2, step: 0.05, unit: '×' },
   voxel: { k: 'voxel', c: true, type: 'check', label: 'voxel' },
   gridSize: { k: 'size', c: true, type: 'range', label: 'gridSize', min: 0.5, max: 1.6, step: 0.05, unit: '×' },
+  pixels: { k: 'cols', c: true, type: 'range', label: 'pixels', min: 6, max: 40, step: 1 },
+  hold: { k: 'hold', c: true, type: 'range', label: 'hold', min: 0.3, max: 5, step: 0.1, unit: 's' },
+  pixelSize: { k: 'size', c: true, type: 'range', label: 'pixelSize', min: 0.5, max: 2, step: 0.05, unit: '×' },
   // performance
   armThickness: { k: 'thickness', c: true, type: 'range', label: 'armThickness', min: 0.3, max: 3, step: 0.05, unit: '×' },
   boxLength: { k: 'length', c: true, type: 'range', label: 'boxLength', min: 0.4, max: 2, step: 0.05, unit: '×' },
@@ -121,6 +124,10 @@ const MOTION_GROUPS = {
     { key: 'startShape', desc: 'descStartShape', rows: START_ROWS },
     { key: 'echoes', desc: 'descEchoes', rows: ECHO_ROWS },
   ],
+  subpix: [
+    { key: 'motion', desc: 'descSubpix', rows: [R.pixels, R.pixelSize, R.hold, R.cutTime] },
+    { key: 'echoes', desc: 'descTone', rows: [R.colorShift, R.air, R.thickness] },
+  ],
   grid: [
     { key: 'motion', desc: 'descGrid', rows: [R.rule, R.cols, R.tick, R.gridSize, R.voxel] },
     { key: 'echoes', desc: 'descHistory', rows: [R.history, R.layerDepth, R.echoOpacity, R.colorShift, R.air, R.thickness] },
@@ -170,7 +177,7 @@ const GLOBAL_SECTIONS = [
   ] },
 ];
 const CAMERA_KEYS = new Set(['camera', 'camDist', 'returnFront', 'panX', 'panY']);
-const LIVE_CAT_KEYS = new Set(['echoDensity', 'echoOpacity', 'colorShift', 'distanceFade', 'echoLength', 'reverse', 'lineColor', 'history', 'layerDepth', 'air', 'glow', 'bpm', 'accent', 'twist', 'ribbon', 'ribbonWidth', 'cropMarks', 'tick', 'gap', 'turnRate']);
+const LIVE_CAT_KEYS = new Set(['echoDensity', 'echoOpacity', 'colorShift', 'distanceFade', 'echoLength', 'reverse', 'lineColor', 'history', 'layerDepth', 'air', 'glow', 'hold', 'bpm', 'accent', 'twist', 'ribbon', 'ribbonWidth', 'cropMarks', 'tick', 'gap', 'turnRate']);
 
 /* =========================================================
    Sidebar rendering
@@ -532,6 +539,7 @@ function buildCategory(id) {
   else if (cat.motion === 'grid') buildGrid(g, base, W0);
   else if (cat.motion === 'dance') buildDance(g, base, W0);
   else if (cat.motion === 'neon') buildNeon(g, base, W0);
+  else if (cat.motion === 'subpix') buildSubpix(g, base, W0);
   else if (cat.motion === 'arm') {
     const n = p.count, shrink = n === 1 ? 1 : n === 2 ? 0.8 : 0.68;
     MULTI[n].forEach((o, i) => {
@@ -1155,6 +1163,74 @@ function updateNeon(g, T) {
   g.rim.alpha[0] = light ? Math.min(1, 0.9 * Math.max(0.3, glow)) : 0.5;
   for (let b = 0; b < 8; b++) g.dTrail.alpha[b] = Math.min(1, 0.6 * Math.pow(1 - b / 8, 1.1) * p.echoOpacity);
   g.glow.forEach(dynEnd); dynEnd(g.rim); dynEnd(g.dTrail);
+}
+
+/* ---------------------------------------------------------
+   Software-based: the sub-pixels of a screen.
+   Every image a program makes is shown through the smallest dots of
+   light on a display. The graphic cycles through four of them, in the
+   order displays developed:
+     TV CRT   tall slots in columns, every other triad shifted (slot mask)
+     PC CRT   round dots in staggered rows (shadow mask, delta triads)
+     XO-1 LCD single dots in diagonal colour rows
+     LCD      long stripes side by side (stripe layout)
+   Each layout holds, then every element shrinks away and the next
+   layout grows in its place, rolling across the screen like a wave.
+   The three channels use three points of the category gradient, not RGB.
+   The field repeats without end, like the screen's own grid.
+   --------------------------------------------------------- */
+const SUBPIX = ['tv', 'pc', 'xo', 'lcd'];
+function subpixLayout(kind, P) {
+  if (kind === 'tv') return { dx: P, dy: 2.1 * P, shift: (i, j, o) => { o[0] = 0; o[1] = (Math.floor(i / 3) % 2 ? 1.05 * P : 0); }, col: i => imod(i, 3), shape: 'rect', w: 0.5 * P, h: 1.55 * P };
+  if (kind === 'pc') return { dx: P, dy: 0.87 * P, shift: (i, j, o) => { o[0] = imod(j, 2) * P * 0.5; o[1] = 0; }, col: (i, j) => imod(i + 2 * j, 3), shape: 'dot', r: 0.34 * P };
+  if (kind === 'xo') return { dx: P, dy: P, shift: (i, j, o) => { o[0] = 0; o[1] = 0; }, col: (i, j) => imod(i + j, 3), shape: 'diamond', r: 0.38 * P };
+  return { dx: P, dy: 3 * P, shift: (i, j, o) => { o[0] = 0; o[1] = 0; }, col: i => imod(i, 3), shape: 'rect', w: 0.56 * P, h: 2.6 * P }; // lcd
+}
+function buildSubpix(g, base, W0) {
+  const p = g.p, { Ws } = stageDims(), P = (Ws / (p.cols * 3)) * p.size;
+  g.sp = { P, o: new THREE.Vector3(0, 0, 0).lerp(base, 0.25), layouts: SUBPIX.map(k => subpixLayout(k, P)) };
+  g.dCells = fogDyn(g, BRAND.LINE.px, 30000, 1);
+  g.update = updateSubpix;
+}
+const spSh = [0, 0], spC = new THREE.Color();
+function updateSubpix(g, T) {
+  const p = g.p, S = g.sp, hold = p.hold, mv = p.duration, W = hold + 2 * mv;
+  const n = Math.floor(Math.max(0, T) / W), local = Math.max(0, T) - n * W, L = S.layouts[n % 4];
+  const stg = mv * 0.45, run = mv - stg; // the wave across the screen takes 45% of each change
+  const ease = x => x * x * (3 - 2 * x);
+  const fr = fogRange(), v = planeView(S.o.z, fr.far), cp = camera.position;
+  let i0 = Math.floor((v.x0 - S.o.x) / L.dx) - 2, i1 = Math.ceil((v.x1 - S.o.x) / L.dx) + 2;
+  let j0 = Math.floor((v.y0 - S.o.y) / L.dy) - 2, j1 = Math.ceil((v.y1 - S.o.y) / L.dy) + 2;
+  const MAXC = 160;
+  if (i1 - i0 > MAXC) { const m = (i0 + i1) >> 1; i0 = m - MAXC / 2; i1 = m + MAXC / 2; }
+  if (j1 - j0 > MAXC) { const m = (j0 + j1) >> 1; j0 = m - MAXC / 2; j1 = m + MAXC / 2; }
+  const tones = [0, 0.5, 1].map(t => t * p.colorShift);
+  dynBegin(g.dCells);
+  for (let j = j0; j <= j1; j++) for (let i = i0; i <= i1; i++) {
+    L.shift(i, j, spSh);
+    const x = S.o.x + i * L.dx + spSh[0], y = S.o.y + j * L.dy + spSh[1], z = S.o.z;
+    // each element waits its turn in a soft wave that rolls across the screen
+    const dl = stg * (0.5 + 0.5 * Math.sin(x * 0.35 + y * 0.22));
+    const grow = ease(clamp01((local - dl) / run)), shrink = ease(clamp01((local - (W - mv) - dl) / run));
+    const s = grow * (1 - shrink);
+    if (s < 0.03) continue;
+    const fog = fogAt(Math.hypot(x - cp.x, y - cp.y, z - cp.z), fr), b = fogB(0.95 * fog);
+    if (b < 0) continue;
+    const c = airy(spC.copy(gcol(g, tones[L.col(i, j)])), (p.air ?? 0) * 0.7 * (1 - fog));
+    if (L.shape === 'rect') dynRect(g.dCells, b, x, y, z, L.w * s, L.h * s, c);
+    else if (L.shape === 'diamond') {
+      const r = L.r * s;
+      dynLine(g.dCells, b, x, y + r, z, x + r, y, z, c); dynLine(g.dCells, b, x + r, y, z, x, y - r, z, c);
+      dynLine(g.dCells, b, x, y - r, z, x - r, y, z, c); dynLine(g.dCells, b, x - r, y, z, x, y + r, z, c);
+    } else {
+      const r = L.r * s, N = 10;
+      for (let q = 0; q < N; q++) {
+        const a0 = (q / N) * Math.PI * 2, a1 = ((q + 1) / N) * Math.PI * 2;
+        dynLine(g.dCells, b, x + r * Math.cos(a0), y + r * Math.sin(a0), z, x + r * Math.cos(a1), y + r * Math.sin(a1), z, c);
+      }
+    }
+  }
+  dynEnd(g.dCells);
 }
 
 /* =========================================================
