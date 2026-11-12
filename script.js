@@ -2,8 +2,8 @@ import * as THREE from 'three';
 import { LineSegments2 } from 'three/addons/lines/LineSegments2.js';
 import { LineSegmentsGeometry } from 'three/addons/lines/LineSegmentsGeometry.js';
 import { LineMaterial } from 'three/addons/lines/LineMaterial.js';
-import * as BRAND from './brand.js?v=20261112e'; // ?v= makes the browser load fresh copies after an update
-import { I18N } from './i18n.js?v=20261112e';
+import * as BRAND from './brand.js?v=20261112f'; // ?v= makes the browser load fresh copies after an update
+import { I18N } from './i18n.js?v=20261112f';
 
 /* =========================================================
    State
@@ -1215,10 +1215,10 @@ function updateSubpix(g, T) {
       // blocks: the screen drops out piece by piece (whole blocks at once), and the next layout comes back the same way;
       // while it holds, a few blocks blink off and on again, like a screen losing parts of its picture
       const bi = Math.floor(i / 4), bj = Math.floor(j / 3), h = seeded(bi * 13.1 + bj * 71.7 + n * 5.3), h2 = seeded(bi * 37.3 + bj * 11.9 + n * 2.7);
-      const dlb = mv * 0.85 * h, pop = mv * 0.15;
+      const dlb = mv * 0.5 * h, pop = mv * 0.5; // each block shrinks and grows smoothly, not in a blink
       const grow = ease(clamp01((local - dlb) / pop)), shrink = ease(clamp01((local - (W - mv) - dlb) / pop));
       s = grow * (1 - shrink);
-      if (h2 < 0.35) { const t0 = mv + hold * (0.15 + 0.6 * seeded(bi * 5.1 + bj * 3.3 + n)), d = hold * 0.22; s *= 1 - ease(clamp01((local - t0) / 0.08)) * (1 - ease(clamp01((local - t0 - d) / 0.08))); }
+      if (h2 < 0.35) { const fd = hold * 0.18, t0 = mv + hold * (0.05 + 0.45 * seeded(bi * 5.1 + bj * 3.3 + n)), d = hold * 0.15; s *= 1 - ease(clamp01((local - t0) / fd)) * (1 - ease(clamp01((local - t0 - fd - d) / fd))); } // shrink away, wait, grow back
     } else {
       // wave: each element waits its turn in a soft wave that rolls across the screen
       const dl = stg * (0.5 + 0.5 * Math.sin(x * 0.35 + y * 0.22));
