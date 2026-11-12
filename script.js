@@ -2,8 +2,8 @@ import * as THREE from 'three';
 import { LineSegments2 } from 'three/addons/lines/LineSegments2.js';
 import { LineSegmentsGeometry } from 'three/addons/lines/LineSegmentsGeometry.js';
 import { LineMaterial } from 'three/addons/lines/LineMaterial.js';
-import * as BRAND from './brand.js?v=20261112c'; // ?v= makes the browser load fresh copies after an update
-import { I18N } from './i18n.js?v=20261112c';
+import * as BRAND from './brand.js?v=20261112d'; // ?v= makes the browser load fresh copies after an update
+import { I18N } from './i18n.js?v=20261112d';
 
 /* =========================================================
    State
@@ -1189,7 +1189,7 @@ function subpixLayout(kind, P) {
 function buildSubpix(g, base, W0) {
   const p = g.p, { Ws } = stageDims(), P = (Ws / (p.cols * 3)) * p.size;
   g.sp = { P, o: new THREE.Vector3(0, 0, 0).lerp(base, 0.25), layouts: SUBPIX.map(k => subpixLayout(k, P)) };
-  g.dCells = fogDyn(g, BRAND.LINE.px, 30000, 1);
+  g.dCells = fogDyn(g, BRAND.LINE.px, 70000, 1);
   g.update = updateSubpix;
 }
 const spSh = [0, 0], spC = new THREE.Color();
@@ -1223,7 +1223,7 @@ function updateSubpix(g, T) {
       dynLine(g.dCells, b, x, y + r, z, x + r, y, z, c); dynLine(g.dCells, b, x + r, y, z, x, y - r, z, c);
       dynLine(g.dCells, b, x, y - r, z, x - r, y, z, c); dynLine(g.dCells, b, x - r, y, z, x, y + r, z, c);
     } else {
-      const r = L.r * s, N = 10;
+      const r = L.r * s, N = 32; // enough sides that the dot reads as a true circle
       for (let q = 0; q < N; q++) {
         const a0 = (q / N) * Math.PI * 2, a1 = ((q + 1) / N) * Math.PI * 2;
         dynLine(g.dCells, b, x + r * Math.cos(a0), y + r * Math.sin(a0), z, x + r * Math.cos(a1), y + r * Math.sin(a1), z, c);
