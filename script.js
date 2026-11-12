@@ -2,8 +2,8 @@ import * as THREE from 'three';
 import { LineSegments2 } from 'three/addons/lines/LineSegments2.js';
 import { LineSegmentsGeometry } from 'three/addons/lines/LineSegmentsGeometry.js';
 import { LineMaterial } from 'three/addons/lines/LineMaterial.js';
-import * as BRAND from './brand.js?v=20261112l'; // ?v= makes the browser load fresh copies after an update
-import { I18N } from './i18n.js?v=20261112l';
+import * as BRAND from './brand.js?v=20261112m'; // ?v= makes the browser load fresh copies after an update
+import { I18N } from './i18n.js?v=20261112m';
 
 /* =========================================================
    State
@@ -695,11 +695,10 @@ function buildNet(g, base, W0) {
    The dot is a filled disc with a radial gradient (not a line), drawn as camera-facing points. */
 function jointTexture(g) {
   const cv = document.createElement('canvas'); cv.width = cv.height = 128;
-  const x = cv.getContext('2d'), gr = x.createRadialGradient(64, 64, 0, 64, 64, 64);
-  const hex = c => '#' + c.getHexString();
-  gr.addColorStop(0, hex(gcol(g, 0))); gr.addColorStop(0.55, hex(gcol(g, 0.45))); gr.addColorStop(0.92, hex(gcol(g, 1)));
-  gr.addColorStop(1, 'rgba(255,255,255,0)');
-  x.fillStyle = gr; x.beginPath(); x.arc(64, 64, 63, 0, Math.PI * 2); x.fill();
+  const x = cv.getContext('2d'), hex = c => '#' + c.getHexString();
+  // two flat colour discs: outer disc in the end colour, smaller inner disc in the start colour
+  x.fillStyle = hex(gcol(g, 1)); x.beginPath(); x.arc(64, 64, 62, 0, Math.PI * 2); x.fill();
+  x.fillStyle = hex(gcol(g, 0)); x.beginPath(); x.arc(64, 64, 34, 0, Math.PI * 2); x.fill();
   return new THREE.CanvasTexture(cv); // used as-is, so the colours match the lines exactly
 }
 function makeJoints(g, max) {
@@ -782,7 +781,7 @@ function crossesAt(g, nodes, T, d, alpha) {
       const k = clamp01((L[a] - half * 0.9) / (half * 0.1));
       if (k <= 0) continue;
       nE.copy(nC).addScaledVector(AX[a], half);
-      jointAdd(g.joints, nE, C.cell * 0.16 * (p.jointSize ?? 1) * k, nd.fog);
+      jointAdd(g.joints, nE, C.cell * 0.1 * (p.jointSize ?? 1) * k, nd.fog);
     }
   });
 }
@@ -798,7 +797,7 @@ function updateNet(g, T) {
   crossesAt(g, nodes, T, g.dArms, 0.95);
   dynEnd(g.dArms);
   J.pts.material.uniforms.uScale.value = (renderH * renderPR * 0.5) / Math.tan(THREE.MathUtils.degToRad(FOV / 2));
-  J.pts.material.uniforms.uMax.value = 34 * lineScale * (p.jointSize ?? 1); // dots close to the camera never grow huge
+  J.pts.material.uniforms.uMax.value = 20 * lineScale * (p.jointSize ?? 1); // dots close to the camera never grow huge
   ['position', 'aSize', 'aAlpha'].forEach(k => { J.geo.attributes[k].needsUpdate = true; });
   J.geo.setDrawRange(0, J.n);
 }
