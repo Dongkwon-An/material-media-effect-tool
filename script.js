@@ -2,8 +2,8 @@ import * as THREE from 'three';
 import { LineSegments2 } from 'three/addons/lines/LineSegments2.js';
 import { LineSegmentsGeometry } from 'three/addons/lines/LineSegmentsGeometry.js';
 import { LineMaterial } from 'three/addons/lines/LineMaterial.js';
-import * as BRAND from './brand.js?v=20261112p'; // ?v= makes the browser load fresh copies after an update
-import { I18N } from './i18n.js?v=20261112p';
+import * as BRAND from './brand.js?v=20261112q'; // ?v= makes the browser load fresh copies after an update
+import { I18N } from './i18n.js?v=20261112q';
 
 /* =========================================================
    State
@@ -759,16 +759,27 @@ function visibleNodes(g) {
   }
   return out;
 }
+/* Once every cycle the whole field locks into a full grid: every arm reaches its neighbour and
+   every turned cross squares up. It holds for 2 s, then the signals take over again. */
+const NET_GRID = { every: 12, first: 6, ramp: 0.8, hold: 2 };
+function gridAmt(T) {
+  const G = NET_GRID, x = T - G.first;
+  if (x < 0) return 0;
+  const t = x % G.every, S = THREE.MathUtils.smootherstep;
+  return S(t, 0, G.ramp) * (1 - S(t, G.ramp + G.hold, G.ramp * 2 + G.hold));
+}
 function crossesAt(g, nodes, T, d, alpha) {
   const p = g.p, C = g.cross, half = C.cell / 2, base = p.gap * half;
   const len = e => (e >= 0 ? base + (half - base) * e : base + (base - half * 0.12) * e);
   nodes.forEach(nd => {
     const b = fogB(alpha * nd.fog);
     if (b < 0) return;
-    const L = [0, 1, 2].map(a => len(waveField(g, nd.gx, nd.gy, nd.gz, T, a)));
+    const G = gridAmt(T);
+    const L = [0, 1, 2].map(a => { const l = len(waveField(g, nd.gx, nd.gy, nd.gz, T, a)); return l + (half - l) * G; });
     let ang = 0;
     // turning crosses step an eighth of a turn (45°) and hold: square → diagonal → square …
     if (nd.turns) { const x = T / (p.duration * 3) + nd.toff, k = Math.floor(x); ang = (Math.PI / 4) * (k + THREE.MathUtils.smootherstep(x - k, 0.75, 1)); }
+    if (G > 0) { const sq = Math.round(ang / (Math.PI / 2)) * (Math.PI / 2); ang += (sq - ang) * G; } // square up for the grid moment
     turnQ.setFromAxisAngle(AXES[nd.axis], ang);
     for (let a = 0; a < 3; a++) AX[a].copy(AXES[a]).applyQuaternion(turnQ);
     const reach = Math.max(L[0], L[1], L[2]);
@@ -812,7 +823,8 @@ function updateNet(g, T) {
   const p = g.p, Lh = Math.min(6, Math.round(p.echoLength)), dt = BRAND.ECHO.spacing * 2 / p.echoDensity;
   const nodes = visibleNodes(g).sort((a, b) => a.fog - b.fog); // far ones first
   dynBegin(g.dArms);
-  for (let k = Lh; k >= 1; k--) crossesAt(g, nodes, T - k * dt, g.dArms, 0.16 * (1 - (k - 1) / Lh) * p.echoOpacity);
+  const clean = 1 - gridAmt(T); // trails clear away while the grid holds, so it reads as one clean grid
+  if (clean > 0.01) for (let k = Lh; k >= 1; k--) crossesAt(g, nodes, T - k * dt, g.dArms, 0.16 * (1 - (k - 1) / Lh) * p.echoOpacity * clean);
   crossesAt(g, nodes, T, g.dArms, 0.95);
   dynEnd(g.dArms);
 }
