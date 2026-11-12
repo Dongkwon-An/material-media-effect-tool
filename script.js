@@ -2,8 +2,8 @@ import * as THREE from 'three';
 import { LineSegments2 } from 'three/addons/lines/LineSegments2.js';
 import { LineSegmentsGeometry } from 'three/addons/lines/LineSegmentsGeometry.js';
 import { LineMaterial } from 'three/addons/lines/LineMaterial.js';
-import * as BRAND from './brand.js?v=20261112d'; // ?v= makes the browser load fresh copies after an update
-import { I18N } from './i18n.js?v=20261112d';
+import * as BRAND from './brand.js?v=20261112e'; // ?v= makes the browser load fresh copies after an update
+import { I18N } from './i18n.js?v=20261112e';
 
 /* =========================================================
    State
@@ -72,6 +72,7 @@ const R = {
   voxel: { k: 'voxel', c: true, type: 'check', label: 'voxel' },
   gridSize: { k: 'size', c: true, type: 'range', label: 'gridSize', min: 0.5, max: 1.6, step: 0.05, unit: '×' },
   pixels: { k: 'cols', c: true, type: 'range', label: 'pixels', min: 6, max: 40, step: 1 },
+  transition: { k: 'transition', c: true, type: 'select', label: 'transition', opts: [['wave', 'trWave'], ['blocks', 'trBlocks']] },
   hold: { k: 'hold', c: true, type: 'range', label: 'hold', min: 0.3, max: 5, step: 0.1, unit: 's' },
   pixelSize: { k: 'size', c: true, type: 'range', label: 'pixelSize', min: 0.5, max: 2, step: 0.05, unit: '×' },
   // performance
@@ -125,7 +126,7 @@ const MOTION_GROUPS = {
     { key: 'echoes', desc: 'descEchoes', rows: ECHO_ROWS },
   ],
   subpix: [
-    { key: 'motion', desc: 'descSubpix', rows: [R.pixels, R.pixelSize, R.hold, R.cutTime] },
+    { key: 'motion', desc: 'descSubpix', rows: [R.transition, R.pixels, R.pixelSize, R.hold, R.cutTime] },
     { key: 'echoes', desc: 'descTone', rows: [R.colorShift, R.air, R.thickness] },
   ],
   grid: [
@@ -177,7 +178,7 @@ const GLOBAL_SECTIONS = [
   ] },
 ];
 const CAMERA_KEYS = new Set(['camera', 'camDist', 'returnFront', 'panX', 'panY']);
-const LIVE_CAT_KEYS = new Set(['echoDensity', 'echoOpacity', 'colorShift', 'distanceFade', 'echoLength', 'reverse', 'lineColor', 'history', 'layerDepth', 'air', 'glow', 'hold', 'bpm', 'accent', 'twist', 'ribbon', 'ribbonWidth', 'cropMarks', 'tick', 'gap', 'turnRate']);
+const LIVE_CAT_KEYS = new Set(['echoDensity', 'echoOpacity', 'colorShift', 'distanceFade', 'echoLength', 'reverse', 'lineColor', 'history', 'layerDepth', 'air', 'glow', 'hold', 'transition', 'bpm', 'accent', 'twist', 'ribbon', 'ribbonWidth', 'cropMarks', 'tick', 'gap', 'turnRate']);
 
 /* =========================================================
    Sidebar rendering
@@ -1204,15 +1205,26 @@ function updateSubpix(g, T) {
   const MAXC = 160;
   if (i1 - i0 > MAXC) { const m = (i0 + i1) >> 1; i0 = m - MAXC / 2; i1 = m + MAXC / 2; }
   if (j1 - j0 > MAXC) { const m = (j0 + j1) >> 1; j0 = m - MAXC / 2; j1 = m + MAXC / 2; }
-  const tones = [0, 0.5, 1].map(t => t * p.colorShift);
+  const tones = [0, 0.5, 1].map(t => t * p.colorShift), blocks = p.transition === 'blocks';
   dynBegin(g.dCells);
   for (let j = j0; j <= j1; j++) for (let i = i0; i <= i1; i++) {
     L.shift(i, j, spSh);
     const x = S.o.x + i * L.dx + spSh[0], y = S.o.y + j * L.dy + spSh[1], z = S.o.z;
-    // each element waits its turn in a soft wave that rolls across the screen
-    const dl = stg * (0.5 + 0.5 * Math.sin(x * 0.35 + y * 0.22));
-    const grow = ease(clamp01((local - dl) / run)), shrink = ease(clamp01((local - (W - mv) - dl) / run));
-    const s = grow * (1 - shrink);
+    let s;
+    if (blocks) {
+      // blocks: the screen drops out piece by piece (whole blocks at once), and the next layout comes back the same way;
+      // while it holds, a few blocks blink off and on again, like a screen losing parts of its picture
+      const bi = Math.floor(i / 4), bj = Math.floor(j / 3), h = seeded(bi * 13.1 + bj * 71.7 + n * 5.3), h2 = seeded(bi * 37.3 + bj * 11.9 + n * 2.7);
+      const dlb = mv * 0.85 * h, pop = mv * 0.15;
+      const grow = ease(clamp01((local - dlb) / pop)), shrink = ease(clamp01((local - (W - mv) - dlb) / pop));
+      s = grow * (1 - shrink);
+      if (h2 < 0.35) { const t0 = mv + hold * (0.15 + 0.6 * seeded(bi * 5.1 + bj * 3.3 + n)), d = hold * 0.22; s *= 1 - ease(clamp01((local - t0) / 0.08)) * (1 - ease(clamp01((local - t0 - d) / 0.08))); }
+    } else {
+      // wave: each element waits its turn in a soft wave that rolls across the screen
+      const dl = stg * (0.5 + 0.5 * Math.sin(x * 0.35 + y * 0.22));
+      const grow = ease(clamp01((local - dl) / run)), shrink = ease(clamp01((local - (W - mv) - dl) / run));
+      s = grow * (1 - shrink);
+    }
     if (s < 0.03) continue;
     const fog = fogAt(Math.hypot(x - cp.x, y - cp.y, z - cp.z), fr), b = fogB(0.95 * fog);
     if (b < 0) continue;

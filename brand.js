@@ -80,7 +80,7 @@ export const CATEGORIES = [
     shape: { ko: '화면을 이루는 가장 작은 빛의 점(서브픽셀) 배열', en: 'The arrays of tiny dots of light (sub-pixels) a screen is made of' },
     rule: { ko: '픽셀 배열이 브라운관 TV → PC 모니터 → XO-1 LCD → LCD 순서로 바뀐다. 작아졌다 커질 때마다 다음 화면의 모양으로 바뀌며 반복된다', en: 'The pixel layout changes from TV CRT to PC CRT to XO-1 LCD to LCD; each time the dots shrink and grow back, they take the next screen’s shape, in a loop' },
     ref: { ko: '디스플레이 서브픽셀 구조: 슬롯 마스크(TV CRT), 섀도 마스크(PC CRT), XO-1 LCD, 스트라이프 LCD', en: 'Display sub-pixel layouts: slot mask (TV CRT), shadow mask (PC CRT), XO-1 LCD, stripe LCD' },
-    defaults: { ...COMMON, cols: 10, size: 1, hold: 1.6, duration: 0.9, colorShift: 1, air: 0.4 },
+    defaults: { ...COMMON, transition: 'wave', cols: 10, size: 1, hold: 1.6, duration: 0.9, colorShift: 1, air: 0.4 },
   },
   {
     id: 'network', motion: 'net', gradient: 'mint-yellow', camera: 'orbit',
