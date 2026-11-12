@@ -83,16 +83,16 @@ export const CATEGORIES = [
     defaults: { ...COMMON, transition: 'wave', cols: 10, size: 1, hold: 1.6, duration: 0.9, colorShift: 1, air: 0.4 },
   },
   {
-    id: 'network', motion: 'net', gradient: 'mint-yellow', camera: 'orbit',
+    id: 'network', motion: 'nodes', gradient: 'mint-yellow', camera: 'orbit',
     // Saffron → Acid Yellow for the first 70%, Mint only in the last 30%, so it reads yellow and never as Moving Image's mint
     colors: ['#F8CE47', '#E6E938', '#02FBCA'], stops: [0, 0.45, 1],
     name: { ko: '네트워크 기반', en: 'Network-based Art' },
     types: { ko: '넷 아트·웹 · 블록체인·NFT · 로커티브·모바일', en: 'Net art / web · Blockchain / NFT · Locative / mobile' },
     basis: { ko: '서버 + 브라우저 + 네트워크', en: 'Server + browser + network' },
-    shape: { ko: '화면을 가득 채운 입체 십자(노드) 격자', en: 'A block of 3D crosses (nodes) filling the frame' },
-    rule: { ko: '신호가 지나가면서 선들끼리 이어지고 뻗어나가기를 반복한다', en: 'As signals pass, lines join up and reach out, again and again' },
-    ref: { ko: '노드와 링크가 연결되고 끊어지는 네트워크 상태', en: 'A network whose nodes and links connect and drop' },
-    defaults: { ...COMMON, crossCols: 4, spread: 1, gap: 0.45, packets: 2, duration: 2.6, turnRate: 0.2, echoLength: 5, echoDensity: 2, colorShift: 1, air: 0.25 },
+    shape: { ko: '공간에 놓인 + 모양 노드와 그 사이를 움직이는 원(접속점)', en: '+ shaped nodes in space and circles (access points) moving among them' },
+    rule: { ko: '원이 가까이 오면 주변의 +가 선으로 이어지며 원이 되고, 멀어지면 선이 끊기고 회전하며 다시 +로 돌아간다', en: 'When a circle comes near, the + nodes around it link to it with lines and become circles; as it moves away the lines break and they turn back into + shapes' },
+    ref: { ko: '접속 범위 안에서만 연결되는 네트워크(와이파이·기지국), 이동하며 접속하는 기기', en: 'Networks that connect only within range (Wi-Fi, cell towers) and devices that connect as they move' },
+    defaults: { ...COMMON, crossCols: 5, spread: 1, gap: 0.5, packets: 2, range: 1.4, duration: 2.5, nodeSize: 1, colorShift: 1, air: 0.3 },
   },
   {
     id: 'light', motion: 'neon', gradient: 'vermilion-yellow', camera: 'orbit',
