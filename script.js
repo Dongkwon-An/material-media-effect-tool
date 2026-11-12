@@ -2,8 +2,8 @@ import * as THREE from 'three';
 import { LineSegments2 } from 'three/addons/lines/LineSegments2.js';
 import { LineSegmentsGeometry } from 'three/addons/lines/LineSegmentsGeometry.js';
 import { LineMaterial } from 'three/addons/lines/LineMaterial.js';
-import * as BRAND from './brand.js?v=20261112s'; // ?v= makes the browser load fresh copies after an update
-import { I18N } from './i18n.js?v=20261112s';
+import * as BRAND from './brand.js?v=20261112t'; // ?v= makes the browser load fresh copies after an update
+import { I18N } from './i18n.js?v=20261112t';
 
 /* =========================================================
    State
@@ -98,6 +98,9 @@ const R = {
   aspect: { k: 'aspect', c: true, type: 'select', label: 'aspect', opts: [['mix', 'aspectMix'], ['16:9', '16:9'], ['3:2', '3:2'], ['4:3', '4:3'], ['1:1', '1:1'], ['4:5', '4:5'], ['9:16', '9:16']], literalOpts: false },
   plateSize: { k: 'size', c: true, type: 'range', label: 'plateSize', min: 0.4, max: 1.6, step: 0.05, unit: '×' },
   cutTime: { k: 'duration', c: true, type: 'range', label: 'cutTime', min: 0.3, max: 4, step: 0.05, unit: 's' },
+  // digital image: layers
+  layerCount: { k: 'layers', c: true, type: 'range', label: 'layerCount', min: 2, max: 10, step: 1 },
+  stackGap: { k: 'stackGap', c: true, type: 'range', label: 'stackGap', min: 0.3, max: 2.5, step: 0.05, unit: '×' },
   // screens
   screenW: { k: 'screenW', c: true, type: 'range', label: 'screenW', min: 0.4, max: 2, step: 0.05, unit: '×' },
   screenH: { k: 'screenH', c: true, type: 'range', label: 'screenH', min: 0.4, max: 2, step: 0.05, unit: '×' },
@@ -154,6 +157,9 @@ const MOTION_GROUPS = {
     { key: 'motion', desc: 'descBody', rows: [R.performers, R.performerSpacing, R.boxLength, R.armThickness, R.amplitude, R.stepTime, R.interval] },
     { key: 'echoes', desc: 'descEchoes', rows: ECHO_ROWS },
   ],
+  layers: [
+    { key: 'motion', desc: 'descLayers', rows: [R.layerCount, R.stackGap, R.cutTime, R.interval, R.plateSize] },
+  ],
   format: [
     { key: 'motion', desc: 'descFormat', rows: [R.count, R.behaviour, R.aspect, R.smallest, R.cutTime, R.interval, R.plateSize, R.thickness] },
   ],
@@ -179,7 +185,7 @@ const GLOBAL_SECTIONS = [
   ] },
 ];
 const CAMERA_KEYS = new Set(['camera', 'camDist', 'returnFront', 'panX', 'panY']);
-const LIVE_CAT_KEYS = new Set(['echoDensity', 'echoOpacity', 'colorShift', 'distanceFade', 'echoLength', 'reverse', 'lineColor', 'history', 'layerDepth', 'air', 'glow', 'hold', 'transition', 'bpm', 'accent', 'twist', 'ribbon', 'ribbonWidth', 'cropMarks', 'tick', 'gap', 'turnRate']);
+const LIVE_CAT_KEYS = new Set(['echoDensity', 'echoOpacity', 'colorShift', 'distanceFade', 'echoLength', 'reverse', 'lineColor', 'history', 'layerDepth', 'air', 'glow', 'hold', 'transition', 'bpm', 'accent', 'twist', 'ribbon', 'ribbonWidth', 'cropMarks', 'tick', 'gap', 'turnRate', 'layers', 'stackGap']);
 
 /* =========================================================
    Sidebar rendering
@@ -537,6 +543,7 @@ function buildCategory(id) {
       g.units.push(makeUnit(g, { ...common, index: i, w: len, E: base.clone().add(new THREE.Vector3(x, 0, (i % 2 ? 1 : -1) * 0.05 * W0)), dims: new THREE.Vector3(len, thin, thin), phase: i / n }));
     }
   } else if (cat.motion === 'format') buildFormat(g, base, W0, common);
+  else if (cat.motion === 'layers') buildLayers(g, base, W0);
   else if (cat.motion === 'net') buildNet(g, base, W0);
   else if (cat.motion === 'grid') buildGrid(g, base, W0);
   else if (cat.motion === 'dance') buildDance(g, base, W0);
@@ -672,6 +679,72 @@ function buildSheet(g, base, W0, common, si, shrink) {
   });
   keys.push(keys[0]);
   g.units.push(makeUnit(g, { ...common, index: si, w: A0 * 0.5, E: new THREE.Vector3(), keys, curveSign: 1 }));
+}
+/* ---------------------------------------------------------
+   Digital image: layers. An image is made of see-through layers.
+   The layers stack up on a diagonal; the stack turns to face
+   the viewer and the layers join into one screen, which then
+   changes its make-up (full screen, a tall strip, a small screen,
+   four split screens …); then the layers lift off and stack up
+   on the diagonal again. Lines only, no trail.
+   --------------------------------------------------------- */
+// screen layouts: rectangles as [centre x, centre y, width, height] inside the full-screen box (-0.5 … 0.5)
+const LAYOUTS = {
+  full: [[0, 0, 1, 1]],
+  quad: [[-0.255, 0.255, 0.49, 0.49], [0.255, 0.255, 0.49, 0.49], [-0.255, -0.255, 0.49, 0.49], [0.255, -0.255, 0.49, 0.49]],
+  tall: [[0, 0, 0.26, 1]],
+  pip: [[0, 0, 1, 1], [0.3, -0.27, 0.32, 0.32]],
+  small: [[0, 0, 0.34, 0.34]],
+  split: [[-0.255, 0, 0.49, 1], [0.255, 0, 0.49, 1]],
+  wide: [[0, 0, 1, 0.28]],
+  cols: [[-0.34, 0, 0.3, 1], [0, 0, 0.3, 1], [0.34, 0, 0.3, 1]],
+  side: [[-0.16, 0, 0.66, 1], [0.34, 0.255, 0.3, 0.49], [0.34, -0.255, 0.3, 0.49]],
+};
+const LAYOUT_SEQ = ['full', 'quad', 'tall', 'pip', 'small', 'split', 'wide', 'cols', 'side'];
+function buildLayers(g, base, W0) {
+  g.ly = { o: base.clone(), qStack: quatFromDeg(-14, 38, 0), q0: new THREE.Quaternion() };
+  g.dLayers = fogDyn(g, BRAND.LINE.px, 600, 1);
+  g.update = updateLayers;
+}
+const lyA = { pos: new THREE.Vector3(), q: new THREE.Quaternion(), w: 0, h: 0 }, lyB = { pos: new THREE.Vector3(), q: new THREE.Quaternion(), w: 0, h: 0 };
+const lyV = new THREE.Vector3(), lyCorners = [new THREE.Vector3(), new THREE.Vector3(), new THREE.Vector3(), new THREE.Vector3()], lyC = new THREE.Color();
+function layersTimeline(g) {
+  const p = g.p, N = Math.round(p.layers || 6), m = p.duration, h = p.interval, st = m * 0.14, S = st * (N - 1);
+  // stack · turn front · layout 1 · change · layout 2 · change · layout 3 · stack up again
+  const seg = [['stack', h], ['toFront', m + S], ['hold', h], ['morph', m], ['hold', h], ['morph', m], ['hold', h], ['toStack', m + S]];
+  return { N, m, h, st, seg, len: seg.reduce((a, s) => a + s[1], 0) };
+}
+function updateLayers(g, T) {
+  const p = g.p, L = g.ly, TL = layersTimeline(g), N = TL.N, { Ws, Hs } = stageDims();
+  const BW = Ws * 0.56 * p.size, BH = Hs * 0.56 * p.size, SW = BW * 0.62, SH = BH * 0.62;
+  const c = Math.max(0, T), cyc = Math.floor(c / TL.len);
+  let t = c - cyc * TL.len, si = 0;
+  while (si < TL.seg.length - 1 && t >= TL.seg[si][1]) { t -= TL.seg[si][1]; si++; }
+  const lay = k => LAYOUTS[LAYOUT_SEQ[(cyc * 3 + k) % LAYOUT_SEQ.length]];
+  const gap = (p.stackGap ?? 1), step = new THREE.Vector3(BW * 0.06 * gap, BH * 0.07 * gap, -BW * 0.13 * gap);
+  const stackPose = (i, o) => { const k = i - (N - 1) / 2; o.pos.set(L.o.x + step.x * k, L.o.y + step.y * k, L.o.z + step.z * i); o.q.copy(L.qStack); o.w = SW; o.h = SH; return o; }; // centred on screen, stepping back into depth (never toward the camera)
+  const frontPose = (rects, i, o) => { const r = rects[i % rects.length]; o.pos.set(L.o.x + r[0] * BW, L.o.y + r[1] * BH, L.o.z); o.q.copy(L.q0); o.w = r[2] * BW; o.h = r[3] * BH; return o; };
+  const S = THREE.MathUtils.smootherstep;
+  dynBegin(g.dLayers);
+  for (let i = 0; i < N; i++) {
+    const kind = TL.seg[si][0];
+    let e = 0;
+    if (kind === 'stack') { stackPose(i, lyA); e = 0; }
+    else if (kind === 'toFront') { stackPose(i, lyA); frontPose(lay(0), i, lyB); e = S(t, i * TL.st, i * TL.st + TL.m); }       // the front layer turns first
+    else if (kind === 'toStack') { frontPose(lay(2), i, lyA); stackPose(i, lyB); e = S(t, (N - 1 - i) * TL.st, (N - 1 - i) * TL.st + TL.m); } // the back layer lifts off first, the others land in front of it
+    else {
+      const k = si <= 2 ? 0 : si <= 4 ? 1 : 2;
+      if (kind === 'hold') frontPose(lay(k), i, lyA);
+      else { frontPose(lay(k - 1 < 0 ? 0 : (si === 3 ? 0 : 1)), i, lyA); frontPose(lay(si === 3 ? 1 : 2), i, lyB); e = S(t, 0, TL.m); }
+    }
+    if (e > 0) { lyA.pos.lerp(lyB.pos, e); lyA.q.slerp(lyB.q, e); lyA.w += (lyB.w - lyA.w) * e; lyA.h += (lyB.h - lyA.h) * e; }
+    const col = airy(lyC.copy(gcol(g, (N > 1 ? i / (N - 1) : 0) * p.colorShift)), (p.air ?? 0) * 0.5 * (i / Math.max(1, N - 1)));
+    const hw = lyA.w / 2, hh = lyA.h / 2;
+    [[-hw, -hh], [hw, -hh], [hw, hh], [-hw, hh]].forEach(([x, y], k) => lyCorners[k].set(x, y, 0).applyQuaternion(lyA.q).add(lyA.pos));
+    const b = fogB(0.95);
+    for (let k = 0; k < 4; k++) dynSeg(g.dLayers, b, lyCorners[k], lyCorners[(k + 1) % 4], col);
+  }
+  dynEnd(g.dLayers);
 }
 const easeSnap = x => (x < 0.5 ? 8 * x * x * x * x : 1 - Math.pow(-2 * x + 2, 4) / 2); // quick, clean move with no bounce
 const lerpRect = (a, b, e) => ({ x0: a.x0 + (b.x0 - a.x0) * e, x1: a.x1 + (b.x1 - a.x1) * e, y0: a.y0 + (b.y0 - a.y0) * e, y1: a.y1 + (b.y1 - a.y1) * e });

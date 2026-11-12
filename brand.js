@@ -115,14 +115,14 @@ export const CATEGORIES = [
     defaults: { ...COMMON, count: 4, behaviour: 'canon', bpm: 84, accent: 0, amplitude: 1.2, twist: 0.6, spread: 1, ribbon: 5, ribbonWidth: 1, strands: 4, echoOpacity: 1, colorShift: 0.8, air: 0.5 },
   },
   {
-    id: 'digital', motion: 'format', gradient: 'violet-magenta', camera: 'orbit',
+    id: 'digital', motion: 'layers', gradient: 'violet-magenta', camera: 'orbit',
     name: { ko: '디지털 이미지', en: 'Digital Image' },
     types: { ko: '디지털 이미지 · 디지털 그래픽', en: 'Digital image · Digital graphic' },
     basis: { ko: '출력물·실물 + 원본 디지털 파일', en: 'Print or object + source digital file' },
-    shape: { ko: '다양한 크기의 판형', en: 'Paper formats in many sizes' },
-    rule: { ko: '여러 스크린이 크기를 자유롭게 바꾸어 간다', en: 'Screens change their size freely' },
-    ref: { ko: '화면 비율(16:9, 3:2, 4:3, 1:1, 4:5, 9:16)', en: 'Screen aspect ratios (16:9, 3:2, 4:3, 1:1, 4:5, 9:16)' },
-    defaults: { ...COMMON, count: 1, aspect: 'mix', steps: 6, duration: 0.9, interval: 0.9, size: 1, echoLength: 16, echoDensity: 3.5, colorShift: 0.7 },
+    shape: { ko: '대각선으로 쌓인 레이어', en: 'Layers stacked on a diagonal' },
+    rule: { ko: '레이어가 대각선 방향으로 쌓였다가, 정면을 보며 모양(전체 화면, 기다란 화면, 작은 화면, 4개로 나눠진 화면 등)을 바꾸고, 다시 대각선 방향으로 쌓이기를 반복한다', en: 'Layers stack up on a diagonal, turn to face the viewer and change shape (full screen, a tall strip, a small screen, four split screens …), then stack up on the diagonal again' },
+    ref: { ko: '이미지 편집 프로그램의 레이어 구조, 화면 분할 레이아웃', en: 'Layer structure in image-editing software, split-screen layouts' },
+    defaults: { ...COMMON, count: 1, layers: 6, stackGap: 1, duration: 1.1, interval: 1, size: 1, echoLength: 16, echoDensity: 3.5, colorShift: 0.8 },
   },
 ];
 
