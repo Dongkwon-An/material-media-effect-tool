@@ -2,8 +2,8 @@ import * as THREE from 'three';
 import { LineSegments2 } from 'three/addons/lines/LineSegments2.js';
 import { LineSegmentsGeometry } from 'three/addons/lines/LineSegmentsGeometry.js';
 import { LineMaterial } from 'three/addons/lines/LineMaterial.js';
-import * as BRAND from './brand.js?v=20261112m'; // ?v= makes the browser load fresh copies after an update
-import { I18N } from './i18n.js?v=20261112m';
+import * as BRAND from './brand.js?v=20261112n'; // ?v= makes the browser load fresh copies after an update
+import { I18N } from './i18n.js?v=20261112n';
 
 /* =========================================================
    State
@@ -692,38 +692,39 @@ function buildNet(g, base, W0) {
   g.update = updateNet;
 }
 /* Joints: where two arms meet and a link is complete, a small round dot appears.
-   The dot is a filled disc with a radial gradient (not a line), drawn as camera-facing points. */
-function jointTexture(g) {
-  const cv = document.createElement('canvas'); cv.width = cv.height = 128;
-  const x = cv.getContext('2d'), hex = c => '#' + c.getHexString();
-  // two flat colour discs: outer disc in the end colour, smaller inner disc in the start colour
-  x.fillStyle = hex(gcol(g, 1)); x.beginPath(); x.arc(64, 64, 62, 0, Math.PI * 2); x.fill();
-  x.fillStyle = hex(gcol(g, 0)); x.beginPath(); x.arc(64, 64, 34, 0, Math.PI * 2); x.fill();
-  return new THREE.CanvasTexture(cv); // used as-is, so the colours match the lines exactly
+   Each dot is one flat disc (no gradient, no stroke), picked at random per meeting point:
+   yellow or mint. Drawn as camera-facing points. */
+function jointColours(g) {
+  const y = gcol(g, 0.45).clone(), e0 = gcol(g, 0), e1 = gcol(g, 1);
+  const d = c => Math.abs(c.r - y.r) + Math.abs(c.g - y.g) + Math.abs(c.b - y.b);
+  return [y, (d(e1) >= d(e0) ? e1 : e0).clone()]; // yellow, and the end colour furthest from it (mint)
 }
 function makeJoints(g, max) {
   const geo = new THREE.BufferGeometry();
   geo.setAttribute('position', new THREE.BufferAttribute(new Float32Array(max * 3), 3));
   geo.setAttribute('aSize', new THREE.BufferAttribute(new Float32Array(max), 1));
   geo.setAttribute('aAlpha', new THREE.BufferAttribute(new Float32Array(max), 1));
+  geo.setAttribute('aPick', new THREE.BufferAttribute(new Float32Array(max), 1));
+  const [cA, cB] = jointColours(g);
   const mat = new THREE.ShaderMaterial({
-    uniforms: { map: { value: jointTexture(g) }, uScale: { value: 1 }, uMax: { value: 40 } },
-    vertexShader: 'attribute float aSize; attribute float aAlpha; uniform float uScale; uniform float uMax; varying float vA; void main(){ vec4 mv = modelViewMatrix * vec4(position, 1.0); gl_PointSize = min(aSize * uScale / -mv.z, uMax); gl_Position = projectionMatrix * mv; vA = aAlpha; }',
-    fragmentShader: 'uniform sampler2D map; varying float vA; void main(){ vec4 c = texture2D(map, gl_PointCoord); gl_FragColor = vec4(c.rgb, c.a * vA); }',
+    uniforms: { uA: { value: cA }, uB: { value: cB }, uScale: { value: 1 }, uMax: { value: 40 } },
+    vertexShader: 'attribute float aSize; attribute float aAlpha; attribute float aPick; uniform float uScale; uniform float uMax; varying float vA; varying float vP; varying float vPx; void main(){ vec4 mv = modelViewMatrix * vec4(position, 1.0); float s = min(aSize * uScale / -mv.z, uMax); gl_PointSize = s; vPx = s; gl_Position = projectionMatrix * mv; vA = aAlpha; vP = aPick; }',
+    fragmentShader: 'uniform vec3 uA; uniform vec3 uB; varying float vA; varying float vP; varying float vPx; void main(){ float r = length(gl_PointCoord - 0.5) * 2.0; float edge = 1.0 - smoothstep(1.0 - 2.0 / max(vPx, 2.0), 1.0, r); if (edge <= 0.0) discard; gl_FragColor = vec4(vP > 0.5 ? uB : uA, edge * vA);\n#include <colorspace_fragment>\n}',
     transparent: true, depthWrite: false,
   });
   const pts = new THREE.Points(geo, mat);
   pts.frustumCulled = false; pts.renderOrder = g.order * 1000 + 900;
   g.group.add(pts);
-  g.extraDispose = () => { geo.dispose(); mat.uniforms.map.value.dispose(); mat.dispose(); };
+  g.extraDispose = () => { geo.dispose(); mat.dispose(); };
   return { pts, geo, max, n: 0, colKey: '' };
 }
-function jointAdd(J, v, size, alpha) {
+function jointAdd(J, v, size, alpha, pick) {
   if (J.n >= J.max) return;
   const i = J.n++, P = J.geo.attributes.position.array;
   P[i * 3] = v.x; P[i * 3 + 1] = v.y; P[i * 3 + 2] = v.z;
-  J.geo.attributes.aSize.array[i] = size; J.geo.attributes.aAlpha.array[i] = alpha;
+  J.geo.attributes.aSize.array[i] = size; J.geo.attributes.aAlpha.array[i] = alpha; J.geo.attributes.aPick.array[i] = pick;
 }
+const jointPick = (x, y, z, a) => { const h = Math.sin(x * 127.1 + y * 311.7 + z * 74.7 + a * 19.3) * 43758.5453; return h - Math.floor(h) < 0.5 ? 0 : 1; };
 const tor = (a, b, n) => { const d = Math.abs(a - b) % n; return Math.min(d, n - d); };
 function waveField(g, gx, gy, gz, T, axis) {
   // travelling spherical fronts on a wrapped tile, so the pattern has no seams
@@ -776,12 +777,12 @@ function crossesAt(g, nodes, T, d, alpha) {
     const c = airy(gcol(g, (tri * 0.9 + ((reach - base) / Math.max(1e-6, half - base)) * 0.1) * p.colorShift, armC), (p.air ?? 0) * 0.7 * (1 - nd.fog));
     nC.set(nd.x, nd.y, nd.z);
     for (let a = 0; a < 3; a++) for (const sg of [1, -1]) { nE.copy(nC).addScaledVector(AX[a], sg * L[a]); dynSeg(d, b, nC, nE, c); }
-    // where this arm meets the neighbour's arm (a finished link), a small gradient dot grows in
+    // where this arm meets the neighbour's arm (a finished link), a small flat dot grows in: yellow or mint at random
     if (g.joints && alpha > 0.5 && Math.abs(ang % (Math.PI / 2)) < 0.05) for (let a = 0; a < 3; a++) {
       const k = clamp01((L[a] - half * 0.9) / (half * 0.1));
       if (k <= 0) continue;
       nE.copy(nC).addScaledVector(AX[a], half);
-      jointAdd(g.joints, nE, C.cell * 0.1 * (p.jointSize ?? 1) * k, nd.fog);
+      jointAdd(g.joints, nE, C.cell * 0.1 * (p.jointSize ?? 1) * k, nd.fog, jointPick(nd.gx, nd.gy, nd.gz, a));
     }
   });
 }
@@ -791,14 +792,14 @@ function updateNet(g, T) {
   dynBegin(g.dArms);
   const J = g.joints;
   J.n = 0;
-  const ck = `${p.reverse}|${p.lineColor}|${p.colorShift}`; // rebuild the dot's gradient when the colours change
-  if (J.colKey !== ck) { J.colKey = ck; const m = J.pts.material; m.uniforms.map.value.dispose(); m.uniforms.map.value = jointTexture(g); }
+  const ck = `${p.reverse}|${p.lineColor}|${p.colorShift}`; // refresh the two dot colours when the colours change
+  if (J.colKey !== ck) { J.colKey = ck; const [cA, cB] = jointColours(g), u = J.pts.material.uniforms; u.uA.value.copy(cA); u.uB.value.copy(cB); }
   for (let k = Lh; k >= 1; k--) crossesAt(g, nodes, T - k * dt, g.dArms, 0.16 * (1 - (k - 1) / Lh) * p.echoOpacity);
   crossesAt(g, nodes, T, g.dArms, 0.95);
   dynEnd(g.dArms);
   J.pts.material.uniforms.uScale.value = (renderH * renderPR * 0.5) / Math.tan(THREE.MathUtils.degToRad(FOV / 2));
   J.pts.material.uniforms.uMax.value = 20 * lineScale * (p.jointSize ?? 1); // dots close to the camera never grow huge
-  ['position', 'aSize', 'aAlpha'].forEach(k => { J.geo.attributes[k].needsUpdate = true; });
+  ['position', 'aSize', 'aAlpha', 'aPick'].forEach(k => { J.geo.attributes[k].needsUpdate = true; });
   J.geo.setDrawRange(0, J.n);
 }
 
