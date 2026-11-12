@@ -2,8 +2,8 @@ import * as THREE from 'three';
 import { LineSegments2 } from 'three/addons/lines/LineSegments2.js';
 import { LineSegmentsGeometry } from 'three/addons/lines/LineSegmentsGeometry.js';
 import { LineMaterial } from 'three/addons/lines/LineMaterial.js';
-import * as BRAND from './brand.js?v=20261112g'; // ?v= makes the browser load fresh copies after an update
-import { I18N } from './i18n.js?v=20261112g';
+import * as BRAND from './brand.js?v=20261112h'; // ?v= makes the browser load fresh copies after an update
+import { I18N } from './i18n.js?v=20261112h';
 
 /* =========================================================
    State
