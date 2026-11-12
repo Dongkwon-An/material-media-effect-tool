@@ -2,8 +2,8 @@ import * as THREE from 'three';
 import { LineSegments2 } from 'three/addons/lines/LineSegments2.js';
 import { LineSegmentsGeometry } from 'three/addons/lines/LineSegmentsGeometry.js';
 import { LineMaterial } from 'three/addons/lines/LineMaterial.js';
-import * as BRAND from './brand.js?v=20261112n'; // ?v= makes the browser load fresh copies after an update
-import { I18N } from './i18n.js?v=20261112n';
+import * as BRAND from './brand.js?v=20261112o'; // ?v= makes the browser load fresh copies after an update
+import { I18N } from './i18n.js?v=20261112o';
 
 /* =========================================================
    State
@@ -768,7 +768,8 @@ function crossesAt(g, nodes, T, d, alpha) {
     if (b < 0) return;
     const L = [0, 1, 2].map(a => len(waveField(g, nd.gx, nd.gy, nd.gz, T, a)));
     let ang = 0;
-    if (nd.turns) { const x = T / (p.duration * 3) + nd.toff, k = Math.floor(x); ang = (Math.PI / 2) * (k + THREE.MathUtils.smootherstep(x - k, 0.75, 1)); }
+    // turning crosses step an eighth of a turn (45°) and hold: square → diagonal → square …
+    if (nd.turns) { const x = T / (p.duration * 3) + nd.toff, k = Math.floor(x); ang = (Math.PI / 4) * (k + THREE.MathUtils.smootherstep(x - k, 0.75, 1)); }
     turnQ.setFromAxisAngle(AXES[nd.axis], ang);
     for (let a = 0; a < 3; a++) AX[a].copy(AXES[a]).applyQuaternion(turnQ);
     const reach = Math.max(L[0], L[1], L[2]);
@@ -776,13 +777,35 @@ function crossesAt(g, nodes, T, d, alpha) {
     const tri = 1 - Math.abs(2 * ((nd.gx + 0.5 * nd.gz) / C.nx % 1) - 1);
     const c = airy(gcol(g, (tri * 0.9 + ((reach - base) / Math.max(1e-6, half - base)) * 0.1) * p.colorShift, armC), (p.air ?? 0) * 0.7 * (1 - nd.fog));
     nC.set(nd.x, nd.y, nd.z);
-    for (let a = 0; a < 3; a++) for (const sg of [1, -1]) { nE.copy(nC).addScaledVector(AX[a], sg * L[a]); dynSeg(d, b, nC, nE, c); }
-    // where this arm meets the neighbour's arm (a finished link), a small flat dot grows in: yellow or mint at random
-    if (g.joints && alpha > 0.5 && Math.abs(ang % (Math.PI / 2)) < 0.05) for (let a = 0; a < 3; a++) {
-      const k = clamp01((L[a] - half * 0.9) / (half * 0.1));
-      if (k <= 0) continue;
-      nE.copy(nC).addScaledVector(AX[a], half);
-      jointAdd(g.joints, nE, C.cell * 0.1 * (p.jointSize ?? 1) * k, nd.fog, jointPick(nd.gx, nd.gy, nd.gz, a));
+    // how diagonal the cross is right now: 0 square to the grid, 1 at 45°
+    const m = ang / (Math.PI / 4), diag = nd.turns ? Math.abs(Math.sin(ang * 2)) : 0, D = Math.SQRT2 * C.cell;
+    // while turned, the two arms in the turning plane reach out to the diagonal neighbours' centres, so the cross stays linked
+    const Lx = [0, 1, 2].map(a => {
+      if (a === nd.axis || diag <= 0) return L[a];
+      const kk = clamp01((L[a] - base) / Math.max(1e-6, half - base));
+      return L[a] + kk * (D - half) * diag;
+    });
+    for (let a = 0; a < 3; a++) for (const sg of [1, -1]) { nE.copy(nC).addScaledVector(AX[a], sg * Lx[a]); dynSeg(d, b, nC, nE, c); }
+    if (!g.joints || alpha <= 0.5) return;
+    const js = C.cell * 0.1 * (p.jointSize ?? 1);
+    const nearInt = Math.abs(m - Math.round(m)) < 0.03, odd = Math.round(m) % 2 !== 0;
+    if (!nearInt) return; // no dots while the cross is still turning
+    if (!odd) {
+      // square: where this arm meets the neighbour's arm (a finished link), a small flat dot grows in: yellow or mint at random
+      for (let a = 0; a < 3; a++) {
+        const k = clamp01((L[a] - half * 0.9) / (half * 0.1));
+        if (k <= 0) continue;
+        nE.copy(nC).addScaledVector(AX[a], half);
+        jointAdd(g.joints, nE, js * k, nd.fog, jointPick(nd.gx, nd.gy, nd.gz, a));
+      }
+    } else {
+      // diagonal: a dot where each long arm lands on the diagonal neighbour's centre
+      for (let a = 0; a < 3; a++) {
+        if (a === nd.axis) continue;
+        const k = clamp01((Lx[a] - D * 0.92) / (D * 0.08));
+        if (k <= 0) continue;
+        for (const sg of [1, -1]) { nE.copy(nC).addScaledVector(AX[a], sg * D); jointAdd(g.joints, nE, js * k, nd.fog, jointPick(nd.gx, nd.gy, nd.gz, a + (sg > 0 ? 3 : 6))); }
+      }
     }
   });
 }
