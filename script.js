@@ -2,8 +2,8 @@ import * as THREE from 'three';
 import { LineSegments2 } from 'three/addons/lines/LineSegments2.js';
 import { LineSegmentsGeometry } from 'three/addons/lines/LineSegmentsGeometry.js';
 import { LineMaterial } from 'three/addons/lines/LineMaterial.js';
-import * as BRAND from './brand.js?v=20261112j'; // ?v= makes the browser load fresh copies after an update
-import { I18N } from './i18n.js?v=20261112j';
+import * as BRAND from './brand.js?v=20261112k'; // ?v= makes the browser load fresh copies after an update
+import { I18N } from './i18n.js?v=20261112k';
 
 /* =========================================================
    State
@@ -52,11 +52,6 @@ const R = {
   packets: { k: 'packets', c: true, type: 'range', label: 'signals', min: 1, max: 6, step: 1 },
   waveTime: { k: 'duration', c: true, type: 'range', label: 'waveTime', min: 1, max: 6, step: 0.1, unit: 's' },
   turnRate: { k: 'turnRate', c: true, type: 'range', label: 'turnRate', min: 0, max: 1, step: 0.05 },
-  movers: { k: 'packets', c: true, type: 'range', label: 'movers', min: 1, max: 5, step: 1 },
-  range: { k: 'range', c: true, type: 'range', label: 'range', min: 0.8, max: 4, step: 0.05, unit: '×' },
-  moverSpeed: { k: 'duration', c: true, type: 'range', label: 'moverSpeed', min: 0.5, max: 6, step: 0.1, unit: 's' },
-  moverSize: { k: 'nodeSize', c: true, type: 'range', label: 'moverSize', min: 0.4, max: 2.5, step: 0.05, unit: '×' },
-  crossSize: { k: 'gap', c: true, type: 'range', label: 'crossSize', min: 0.2, max: 1, step: 0.01 },
   // light
   length: { k: 'length', c: true, type: 'range', label: 'length', min: 0.4, max: 2.5, step: 0.05, unit: '×' },
   spin: { k: 'spin', c: true, type: 'select', label: 'spin', opts: [[1, '1'], [2, '2'], [3, '3'], [4, '4']], num: true, literalOpts: true },
@@ -138,10 +133,6 @@ const MOTION_GROUPS = {
     { key: 'motion', desc: 'descGrid', rows: [R.rule, R.cols, R.tick, R.gridSize, R.voxel] },
     { key: 'echoes', desc: 'descHistory', rows: [R.history, R.layerDepth, R.echoOpacity, R.colorShift, R.air, R.thickness] },
   ],
-  nodes: [
-    { key: 'motion', desc: 'descNodes', rows: [R.movers, R.range, R.moverSpeed, R.moverSize, R.crossCols, R.crossSize, R.spread] },
-    { key: 'echoes', desc: 'descTone', rows: [R.colorShift, R.air, R.thickness] },
-  ],
   net: [
     { key: 'motion', desc: 'descNet', rows: [R.crossCols, R.spread, R.gap, R.packets, R.waveTime, R.turnRate] },
     { key: 'echoes', desc: 'descEchoes', rows: [R.echoLength, R.echoDensity, R.echoOpacity, R.colorShift, R.air, R.thickness] },
@@ -187,7 +178,7 @@ const GLOBAL_SECTIONS = [
   ] },
 ];
 const CAMERA_KEYS = new Set(['camera', 'camDist', 'returnFront', 'panX', 'panY']);
-const LIVE_CAT_KEYS = new Set(['echoDensity', 'echoOpacity', 'colorShift', 'distanceFade', 'echoLength', 'reverse', 'lineColor', 'history', 'layerDepth', 'air', 'glow', 'hold', 'transition', 'range', 'gap', 'nodeSize', 'bpm', 'accent', 'twist', 'ribbon', 'ribbonWidth', 'cropMarks', 'tick', 'gap', 'turnRate']);
+const LIVE_CAT_KEYS = new Set(['echoDensity', 'echoOpacity', 'colorShift', 'distanceFade', 'echoLength', 'reverse', 'lineColor', 'history', 'layerDepth', 'air', 'glow', 'hold', 'transition', 'bpm', 'accent', 'twist', 'ribbon', 'ribbonWidth', 'cropMarks', 'tick', 'gap', 'turnRate']);
 
 /* =========================================================
    Sidebar rendering
@@ -550,7 +541,6 @@ function buildCategory(id) {
   else if (cat.motion === 'dance') buildDance(g, base, W0);
   else if (cat.motion === 'neon') buildNeon(g, base, W0);
   else if (cat.motion === 'subpix') buildSubpix(g, base, W0);
-  else if (cat.motion === 'nodes') buildNodes(g, base, W0);
   else if (cat.motion === 'arm') {
     const n = p.count, shrink = n === 1 ? 1 : n === 2 ? 0.8 : 0.68;
     MULTI[n].forEach((o, i) => {
@@ -1257,84 +1247,6 @@ function updateSubpix(g, T) {
     }
   }
   dynEnd(g.dCells);
-}
-
-/* ---------------------------------------------------------
-   Network-based: access points moving through a field of nodes.
-   The field: + shaped nodes in a 3D grid that goes on without end.
-   The access points: circles that wander through the space, like
-     devices or users moving around (locative / mobile network art).
-   Range: a node within reach of an access point links to it with a
-     line and turns from + into a circle (connected). Out of reach,
-     the line breaks and the circle turns back into a +, rotating as
-     it does: the node returning to waiting.
-   Everything faces the viewer; depth comes from perspective and the
-   fading of far nodes.
-   --------------------------------------------------------- */
-function buildNodes(g, base, W0) {
-  const p = g.p, { Hs } = stageDims(), ny = p.crossCols, cell = (Hs * 1.1 * p.spread) / Math.max(1, ny - 1);
-  const nx = Math.max(2, Math.round(ny * 1.6)), nz = ny;
-  g.cross = { cell, nx, ny, nz, ctr: new THREE.Vector3(0, 0, 0).lerp(base, 0.25), frustum: new THREE.Frustum(), m4: new THREE.Matrix4(), sph: new THREE.Sphere() };
-  g.movers = Array.from({ length: p.packets }, (_, i) => ({ seed: 700 + i * 131, pos: new THREE.Vector3() }));
-  g.dNodes = fogDyn(g, BRAND.LINE.px, 40000, 1);
-  g.dLinks = fogDyn(g, BRAND.LINE.linkPx, 4000, 0);
-  g.dMovers = makeDyn(g, BRAND.LINE.px, p.packets * 88 + 8, 1, 3);
-  g.update = updateNodes;
-}
-function moverAt(g, mv, T, out) {
-  // a smooth, wandering path through the space around the centre of the view
-  const p = g.p, { Ws, Hs } = stageDims(), s = mv.seed, t = T / (p.duration * 1.6);
-  const w = (k, f) => 0.6 * Math.sin(t * f * (0.7 + seeded(s + k) * 0.6) + seeded(s + k + 9) * 6.28) + 0.4 * Math.sin(t * f * 1.9 * (0.7 + seeded(s + k + 3) * 0.6) + seeded(s + k + 17) * 6.28);
-  return out.set(w(1, 1) * Ws * 0.32, w(2, 0.8) * Hs * 0.3, w(3, 0.6) * Hs * 0.45 - Hs * 0.25).add(g.cross.ctr);
-}
-const ndR = new THREE.Vector3(), ndU = new THREE.Vector3(), ndC = new THREE.Vector3(), ndA = new THREE.Vector3(), ndB = new THREE.Vector3();
-const ndCol = new THREE.Color(), ndLink = new THREE.Color();
-function updateNodes(g, T) {
-  const p = g.p, C = g.cross, R = p.range * C.cell, half = C.cell / 2, armL = p.gap * half, ringR = half * 0.28;
-  ndR.setFromMatrixColumn(camera.matrixWorld, 0); ndU.setFromMatrixColumn(camera.matrixWorld, 1);
-  g.movers.forEach(m => moverAt(g, m, T, m.pos));
-  const nodes = visibleNodes(g).sort((a, b) => a.fog - b.fog);
-  [g.dNodes, g.dLinks, g.dMovers].forEach(dynBegin);
-  const idle = airy(ndCol.copy(gcol(g, 1)), 0.25).clone(), on = gcol(g, 0).clone();
-  nodes.forEach(nd => {
-    ndC.set(nd.x, nd.y, nd.z);
-    // closeness to the nearest access point: 1 = connected, 0 = out of range
-    let q = 0, near = null;
-    g.movers.forEach(m => { const d = ndC.distanceTo(m.pos), k = 1 - THREE.MathUtils.smoothstep(d, R * 0.55, R); if (k > q) { q = k; near = m; } });
-    const col = ndCol.copy(idle).lerp(on, q), bb = fogB((0.55 + 0.45 * q) * nd.fog);
-    if (bb < 0) return;
-    // + shrinks into a circle as it connects; coming back, the + turns a quarter turn as it reforms
-    const ang = (Math.PI / 2) * q, ca = Math.cos(ang), sa = Math.sin(ang), L = armL * (1 - q);
-    if (L > 1e-4) for (const [ux, uy] of [[ca, sa], [-sa, ca]]) {
-      ndA.copy(ndC).addScaledVector(ndR, ux * L).addScaledVector(ndU, uy * L);
-      ndB.copy(ndC).addScaledVector(ndR, -ux * L).addScaledVector(ndU, -uy * L);
-      dynSeg(g.dNodes, bb, ndA, ndB, col);
-    }
-    const rr = ringR * q;
-    if (rr > 1e-4) for (let s = 0; s < 24; s++) {
-      const a0 = (s / 24) * Math.PI * 2, a1 = ((s + 1) / 24) * Math.PI * 2;
-      ndA.copy(ndC).addScaledVector(ndR, Math.cos(a0) * rr).addScaledVector(ndU, Math.sin(a0) * rr);
-      ndB.copy(ndC).addScaledVector(ndR, Math.cos(a1) * rr).addScaledVector(ndU, Math.sin(a1) * rr);
-      dynSeg(g.dNodes, bb, ndA, ndB, col);
-    }
-    // the link: a line from the access point to the node, as long as it is in range
-    if (near && q > 0.02) {
-      const lb = fogB(q * 0.9 * nd.fog);
-      if (lb >= 0) dynSeg(g.dLinks, lb, near.pos, ndC, ndLink.copy(on));
-    }
-  });
-  // the access points: larger circles
-  g.movers.forEach(m => {
-    // a double circle, so the access point never looks like a connected node
-    for (const r of [C.cell * 0.5 * p.nodeSize, C.cell * 0.3 * p.nodeSize]) for (let s = 0; s < 40; s++) {
-      const a0 = (s / 40) * Math.PI * 2, a1 = ((s + 1) / 40) * Math.PI * 2;
-      ndA.copy(m.pos).addScaledVector(ndR, Math.cos(a0) * r).addScaledVector(ndU, Math.sin(a0) * r);
-      ndB.copy(m.pos).addScaledVector(ndR, Math.cos(a1) * r).addScaledVector(ndU, Math.sin(a1) * r);
-      dynSeg(g.dMovers, 0, ndA, ndB, on);
-    }
-  });
-  g.dMovers.alpha[0] = 1;
-  [g.dNodes, g.dLinks, g.dMovers].forEach(dynEnd);
 }
 
 /* =========================================================
