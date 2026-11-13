@@ -63,7 +63,7 @@ const COMMON = {
 */
 export const CATEGORIES = [
   {
-    id: 'moving', motion: 'layers', gradient: 'violet-mint', flip: true, camera: 'low',
+    id: 'moving', motion: 'layers', gradient: 'violet-mint', flip: true, camera: 'low', fit: 1,
     name: { ko: '영상·사운드', en: 'Moving Image & Sound' },
     types: { ko: '필름 · 슬라이드 · 단채널 비디오 · 다채널 비디오 설치 · 사운드 아트', en: 'Film · Slide · Single-channel video · Multi-channel installation · Sound art' },
     basis: { ko: '영상 파일·필름 + 재생 장치', en: 'Video file or film + playback device' },
@@ -73,7 +73,7 @@ export const CATEGORIES = [
     defaults: { ...COMMON, layers: 6, stackGap: 1, size: 1, colorShift: 0.8, echoLength: 14, echoDensity: 2.5, duration: 1.1, interval: 1, swing: 55, path: 'curve', quant: 0, screenW: 1, screenH: 1, screenD: 0.04, startW: 0.55, startH: 0.55, startD: 0.55 },
   },
   {
-    id: 'software', motion: 'subpix', gradient: 'blue-mint', camera: 'orbit',
+    id: 'software', motion: 'subpix', gradient: 'blue-mint', camera: 'orbit', fit: 0.75,
     name: { ko: '소프트웨어 기반', en: 'Software-based Art' },
     types: { ko: '소프트웨어·생성형 · AI 기반 · 인터랙티브·센서 · 게임 아트 · 몰입형 XR', en: 'Software / generative · AI-based · Interactive / sensor · Game art · Immersive XR' },
     basis: { ko: '코드 + 실행 환경', en: 'Code + runtime environment' },
@@ -83,7 +83,7 @@ export const CATEGORIES = [
     defaults: { ...COMMON, transition: 'wave', cols: 10, size: 1, hold: 1.6, duration: 0.9, colorShift: 1, air: 0.4 },
   },
   {
-    id: 'network', motion: 'net', gradient: 'mint-yellow', camera: 'orbit',
+    id: 'network', motion: 'net', gradient: 'mint-yellow', camera: 'orbit', fit: 1,
     // Saffron → Acid Yellow for the first 70%, Mint only in the last 30%, so it reads yellow and never as Moving Image's mint
     colors: ['#F8CE47', '#E6E938', '#02FBCA'], stops: [0, 0.45, 1],
     name: { ko: '네트워크 기반', en: 'Network-based Art' },
@@ -95,7 +95,7 @@ export const CATEGORIES = [
     defaults: { ...COMMON, crossCols: 4, spread: 1, gap: 0.45, packets: 2, duration: 2.6, turnRate: 0.2, echoLength: 5, echoDensity: 2, colorShift: 1, air: 0.25 },
   },
   {
-    id: 'light', motion: 'neon', gradient: 'vermilion-yellow', camera: 'orbit',
+    id: 'light', motion: 'neon', gradient: 'vermilion-yellow', camera: 'orbit', fit: 0.85,
     name: { ko: '라이트·키네틱', en: 'Light & Kinetic Art' },
     types: { ko: '라이트 아트 · 키네틱·로보틱 · 홀로그램·광학', en: 'Light art · Kinetic / robotic · Hologram / optical' },
     basis: { ko: '광원 + 전기·기계 장치', en: 'Light source + electrical or mechanical device' },
@@ -105,7 +105,7 @@ export const CATEGORIES = [
     defaults: { ...COMMON, count: 3, spacing: 1, length: 0.85, spin: 1, tilt: 22, duration: 3, glow: 1, echoLength: 90, echoDensity: 1.4, echoOpacity: 1, colorShift: 0.9 },
   },
   {
-    id: 'performance', motion: 'dance', gradient: 'magenta-saffron', camera: 'orbit',
+    id: 'performance', motion: 'dance', gradient: 'magenta-saffron', camera: 'orbit', fit: 0.8,
     name: { ko: '퍼포먼스', en: 'Performance' },
     types: { ko: '미디어 퍼포먼스', en: 'Media performance' },
     basis: { ko: '지시문 + 수행자 + 미디어 요소', en: 'Score + performer + media' },
@@ -115,14 +115,14 @@ export const CATEGORIES = [
     defaults: { ...COMMON, count: 4, behaviour: 'canon', bpm: 84, accent: 0, amplitude: 1.2, twist: 0.6, spread: 1, ribbon: 5, ribbonWidth: 1, strands: 4, echoOpacity: 1, colorShift: 0.8, air: 0.5 },
   },
   {
-    id: 'digital', motion: 'format', gradient: 'violet-magenta', camera: 'orbit',
+    id: 'digital', motion: 'format', gradient: 'violet-magenta', camera: 'orbit', fit: 1,
     name: { ko: '디지털 이미지', en: 'Digital Image' },
     types: { ko: '디지털 이미지 · 디지털 그래픽', en: 'Digital image · Digital graphic' },
     basis: { ko: '출력물·실물 + 원본 디지털 파일', en: 'Print or object + source digital file' },
     shape: { ko: '다양한 크기의 판형', en: 'Paper formats in many sizes' },
     rule: { ko: '여러 스크린이 크기를 자유롭게 바꾸어 간다', en: 'Screens change their size freely' },
     ref: { ko: '화면 비율(16:9, 3:2, 4:3, 1:1, 4:5, 9:16)', en: 'Screen aspect ratios (16:9, 3:2, 4:3, 1:1, 4:5, 9:16)' },
-    defaults: { ...COMMON, count: 1, aspect: 'mix', steps: 6, duration: 0.9, interval: 0.9, size: 1, echoLength: 16, echoDensity: 3.5, colorShift: 0.7 },
+    defaults: { ...COMMON, count: 1, aspect: 'mix', steps: 4, duration: 0.9, interval: 0.9, size: 1, echoLength: 16, echoDensity: 3.5, colorShift: 0.7 },
   },
 ];
 

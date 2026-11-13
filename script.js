@@ -2,8 +2,8 @@ import * as THREE from 'three';
 import { LineSegments2 } from 'three/addons/lines/LineSegments2.js';
 import { LineSegmentsGeometry } from 'three/addons/lines/LineSegmentsGeometry.js';
 import { LineMaterial } from 'three/addons/lines/LineMaterial.js';
-import * as BRAND from './brand.js?v=20261113c'; // ?v= makes the browser load fresh copies after an update
-import { I18N } from './i18n.js?v=20261113c';
+import * as BRAND from './brand.js?v=20261113d'; // ?v= makes the browser load fresh copies after an update
+import { I18N } from './i18n.js?v=20261113d';
 
 /* =========================================================
    State
@@ -303,6 +303,7 @@ function toggleCategory(id, on) {
     state.on.add(id);
     state.edit = id;
     state.camera = CAT[id].camera; // each category brings the camera that suits it
+    state.camDist = CAT[id].fit ?? 1; state.panX = 0; state.panY = 0; // …and a distance at which its graphic fills the frame
     resetView();
   } else {
     state.on.delete(id);
@@ -720,7 +721,7 @@ const lyA = { pos: new THREE.Vector3(), q: new THREE.Quaternion(), w: 0, h: 0 },
 const lyCorners = [new THREE.Vector3(), new THREE.Vector3(), new THREE.Vector3(), new THREE.Vector3()], lyC = new THREE.Color(), lyF = new THREE.Color();
 const RIGS_PER_ROUND = 4;
 // fixed timing: every move runs at the same speed, so a still frame (PNG) always shows the same evenly spaced echoes
-const LY_MOVE = 1.6, LY_HOLD = 1.2;
+const LY_MOVE = 1.6, LY_HOLD = 2.4; // a longer stop after each change
 function layersTimeline(g) {
   const p = g.p, N = Math.round(p.layers || 6), m = LY_MOVE, h = LY_HOLD, st = m * 0.14, S = st * (N - 1);
   // stack · set up in the room · hold · change · hold · change · hold · change · hold · stack up again
@@ -732,7 +733,7 @@ function layersTimeline(g) {
 const lin = (x, a, b) => clamp01((x - a) / (b - a)); // constant speed from a to b
 function layerPose(g, TL, T, i, o) {
   const L = g.ly, N = TL.N, { Hs } = stageDims(), p = g.p;
-  const BH = Hs * 0.42 * p.size, BW = BH * A169, SW = BW * 0.62, SH = BH * 0.62;
+  const BH = Hs * 0.76 * p.size, BW = BH * A169, SW = BW * 0.62, SH = BH * 0.62;
   const c = Math.max(0, T), cyc = Math.floor(c / TL.len);
   let t = c - cyc * TL.len, si = 0;
   while (si < TL.seg.length - 1 && t >= TL.seg[si][1]) { t -= TL.seg[si][1]; si++; }
@@ -1388,7 +1389,7 @@ function updateSubpix(g, T) {
   const n = Math.floor(Math.max(0, T) / W), local = Math.max(0, T) - n * W, L = S.layouts[n % 4];
   const stg = mv * 0.45, run = mv - stg; // the wave across the screen takes 45% of each change
   const ease = x => x * x * (3 - 2 * x);
-  const fr = fogRange(), v = planeView(S.o.z, fr.far), cp = camera.position;
+  const fr0 = fogRange(), fr = { near: fr0.near * 1.5, far: fr0.far * 1.8 }, v = planeView(S.o.z, fr.far), cp = camera.position; // reaches further, so the screen fills the frame even when the camera looks along it
   let i0 = Math.floor((v.x0 - S.o.x) / L.dx) - 2, i1 = Math.ceil((v.x1 - S.o.x) / L.dx) + 2;
   let j0 = Math.floor((v.y0 - S.o.y) / L.dy) - 2, j1 = Math.ceil((v.y1 - S.o.y) / L.dy) + 2;
   const MAXC = 160;
