@@ -2,8 +2,8 @@ import * as THREE from 'three';
 import { LineSegments2 } from 'three/addons/lines/LineSegments2.js';
 import { LineSegmentsGeometry } from 'three/addons/lines/LineSegmentsGeometry.js';
 import { LineMaterial } from 'three/addons/lines/LineMaterial.js';
-import * as BRAND from './brand.js?v=20261113g'; // ?v= makes the browser load fresh copies after an update
-import { I18N } from './i18n.js?v=20261113g';
+import * as BRAND from './brand.js?v=20261113h'; // ?v= makes the browser load fresh copies after an update
+import { I18N } from './i18n.js?v=20261113h';
 
 /* =========================================================
    State
@@ -796,10 +796,10 @@ function updateLayers(g, T) {
    (a square becomes a cube); then they come back down and it is flat
    again. Fixed timing, so still frames always match.
    --------------------------------------------------------- */
-const TURN_SIZES = [[1, 1], [1.5, 0.9], [0.75, 1.15], [1.2, 1.2], [1.6, 0.8], [0.9, 0.9], [1.1, 1.35]]; // width, height (× unit); squares become cubes
+const TURN_SIZES = [[1.3, 1.3], [0.5, 0.5], [2.0, 0.7], [0.6, 1.5], [0.9, 0.9], [1.8, 1.1], [0.45, 0.8], [1.6, 1.6], [0.8, 0.35]]; // width, height (× unit); squares become cubes
 // globe-like turns: two full turns about two different axes at once, so the sheet tumbles through many directions and lands where it started
 const TURN_AXES = [[[0, 1, 0], [1, 0, 0]], [[0.3, 1, 0.2], [0, 0, 1]], [[1, 0.4, 0], [0, 1, 0]], [[0, 1, 0.5], [1, 0, 0.3]]].map(pair => pair.map(v => new THREE.Vector3(...v).normalize()));
-const TU = { spin: 2.8, rest: 0.5, move: 0.9, gap: 0.12, hold: 1.6, end: 0.6 };
+const TU = { spin: 5.2, rest: 0.5, move: 0.9, gap: 0.12, hold: 1.6, end: 0.6 };
 function buildTurn(g, base) {
   g.tu = { o: base.clone(), q0: quatFromDeg(-28, 38, 0) }; // seen from above and to the side, so the solid's depth reads
   g.dTurn = fogDyn(g, BRAND.LINE.px, 20000, 1);
@@ -839,7 +839,9 @@ function updateTurn(g, T) {
     const base = (N > 1 ? j / (N - 1) : 0) * p.colorShift;
     tuP.w = -1;
     for (let k = Lh; k >= 1; k--) { // stepped echoes, oldest first, only where the layer was moving
-      if (!turnPose(g, TL, T - k * dt, j, tuA)) { tuP.w = -1; continue; }
+      const te = T - k * dt, tc = Math.max(0, te) % TL.len;
+      if (tc < TL.spinEnd + TU.rest * 0.5) { tuP.w = -1; continue; } // no echoes while the flat sheet turns
+      if (!turnPose(g, TL, te, j, tuA)) { tuP.w = -1; continue; }
       const moved = tuP.w < 0 ? 0 : tuA.pos.distanceTo(tuP.pos) + Math.abs(tuA.w - tuP.w) + Math.abs(tuA.h - tuP.h) + (1 - Math.abs(tuA.q.dot(tuP.q))) * 40;
       tuP.pos.copy(tuA.pos); tuP.q.copy(tuA.q); tuP.w = tuA.w; tuP.h = tuA.h;
       if (moved < 0.004) continue;
