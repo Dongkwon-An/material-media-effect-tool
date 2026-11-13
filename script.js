@@ -2,8 +2,8 @@ import * as THREE from 'three';
 import { LineSegments2 } from 'three/addons/lines/LineSegments2.js';
 import { LineSegmentsGeometry } from 'three/addons/lines/LineSegmentsGeometry.js';
 import { LineMaterial } from 'three/addons/lines/LineMaterial.js';
-import * as BRAND from './brand.js?v=20261113a'; // ?v= makes the browser load fresh copies after an update
-import { I18N } from './i18n.js?v=20261113a';
+import * as BRAND from './brand.js?v=20261113b'; // ?v= makes the browser load fresh copies after an update
+import { I18N } from './i18n.js?v=20261113b';
 
 /* =========================================================
    State
@@ -686,7 +686,7 @@ function buildSheet(g, base, W0, common, si, shrink) {
    projection wall, a long strip, three channels with the side screens
    turned in, a corner, a video wall, standing or hanging screens …
    four set-ups in a round; then they lift off and stack up again.
-   A faint floor outline shows the room. Lines only, no trail.
+   Lines only, no trail.
    --------------------------------------------------------- */
 // Screen set-ups as they would be installed in a room. Each screen: [x, y, z, width, height, turn (°, about the vertical), tilt (°)],
 // in units of the full screen's height, around the centre of the room; the floor is at y = -0.5.
@@ -737,20 +737,7 @@ function updateLayers(g, T) {
   const stackPose = (i, o) => { const k = i - (N - 1) / 2; o.pos.set(L.o.x + step.x * k, L.o.y + step.y * k, L.o.z + step.z * i); o.q.copy(L.qStack); o.w = SW; o.h = SH; return o; }; // centred, stepping back into depth
   const rigPose = (name, i, o) => { const list = RIG[name], j = i % list.length, r = list[j]; o.pos.set(L.o.x + r[0] * BH, L.o.y + r[1] * BH, L.o.z + r[2] * BH); o.q.copy(RIG_Q[name][j]); o.w = r[3] * BH; o.h = r[4] * BH; return o; };
   const S = THREE.MathUtils.smootherstep, [kind, , k] = TL.seg[si];
-  let inRoom = 1; // how much the room (floor) is there
-  if (kind === 'stack') inRoom = 0;
-  else if (kind === 'toRig') inRoom = S(t, 0, TL.m + TL.st * (N - 1));
-  else if (kind === 'toStack') inRoom = 1 - S(t, 0, TL.m + TL.st * (N - 1));
   dynBegin(g.dLayers);
-  // the floor of the room the screens are installed in: a faint outline
-  if (inRoom > 0.02) {
-    const fy = L.o.y - 0.5 * BH, x0 = L.o.x - BW * 0.85, x1 = L.o.x + BW * 0.85, z0 = L.o.z - BH * 1.4, z1 = L.o.z + BH * 0.9;
-    const fc = airy(lyF.copy(gcol(g, 0.5 * p.colorShift)), 0.55), fb = fogB(0.55 * inRoom);
-    if (fb >= 0) {
-      lyCorners[0].set(x0, fy, z1); lyCorners[1].set(x1, fy, z1); lyCorners[2].set(x1, fy, z0); lyCorners[3].set(x0, fy, z0);
-      for (let q = 0; q < 4; q++) dynSeg(g.dLayers, fb, lyCorners[q], lyCorners[(q + 1) % 4], fc);
-    }
-  }
   for (let i = 0; i < N; i++) {
     let e = 0;
     if (kind === 'stack') stackPose(i, lyA);
