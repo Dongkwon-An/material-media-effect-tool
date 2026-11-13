@@ -2,8 +2,8 @@ import * as THREE from 'three';
 import { LineSegments2 } from 'three/addons/lines/LineSegments2.js';
 import { LineSegmentsGeometry } from 'three/addons/lines/LineSegmentsGeometry.js';
 import { LineMaterial } from 'three/addons/lines/LineMaterial.js';
-import * as BRAND from './brand.js?v=20261113e'; // ?v= makes the browser load fresh copies after an update
-import { I18N } from './i18n.js?v=20261113e';
+import * as BRAND from './brand.js?v=20261113f'; // ?v= makes the browser load fresh copies after an update
+import { I18N } from './i18n.js?v=20261113f';
 
 /* =========================================================
    State
@@ -102,6 +102,7 @@ const R = {
   layerCount: { k: 'layers', c: true, type: 'range', label: 'layerCount', min: 2, max: 10, step: 1 },
   stackTwist: { k: 'stackTwist', c: true, type: 'range', label: 'stackTwist', min: 0, max: 20, step: 0.5, unit: '°' },
   turnLayers: { k: 'layers', c: true, type: 'range', label: 'layerCount', min: 3, max: 24, step: 1 },
+  boxDepth: { k: 'stackGap', c: true, type: 'range', label: 'boxDepth', min: 0.3, max: 2, step: 0.05, unit: '×' },
   stackGap: { k: 'stackGap', c: true, type: 'range', label: 'stackGap', min: 0.3, max: 2.5, step: 0.05, unit: '×' },
   // screens
   screenW: { k: 'screenW', c: true, type: 'range', label: 'screenW', min: 0.4, max: 2, step: 0.05, unit: '×' },
@@ -164,7 +165,7 @@ const MOTION_GROUPS = {
     { key: 'echoes', desc: 'descEchoes', rows: [R.echoLength, R.echoDensity, R.echoOpacity, R.colorShift, R.air] },
   ],
   turn: [
-    { key: 'motion', desc: 'descTurn', rows: [R.turnLayers, R.stackTwist, R.stackGap, R.plateSize] },
+    { key: 'motion', desc: 'descTurn', rows: [R.turnLayers, R.boxDepth, R.plateSize] },
     { key: 'echoes', desc: 'descEchoes', rows: [R.echoLength, R.echoDensity, R.echoOpacity, R.colorShift, R.air] },
   ],
   format: [
@@ -789,15 +790,18 @@ function updateLayers(g, T) {
 }
 /* ---------------------------------------------------------
    Digital image: a flat sheet (a different rectangle or square
-   every round) turns a full 360°, leaving stepped echoes; then
-   layers stack up out of it, each turned a little further, so the
-   flat image becomes a solid; then the layers fold back down and
-   it is flat again. Fixed timing, so still frames always match.
+   every round) tumbles through a full turn in many directions, like
+   a globe, leaving stepped echoes; then layers rise out of it, each
+   turning as it climbs and landing square, until the sheet is a box
+   (a square becomes a cube); then they come back down and it is flat
+   again. Fixed timing, so still frames always match.
    --------------------------------------------------------- */
-const TURN_SIZES = [[1, 1], [1.5, 0.95], [0.7, 1.1], [1.25, 1.25], [1.7, 0.75], [0.85, 0.85], [1.1, 1.4]]; // width, height (× unit)
-const TU = { spin: 2.4, rest: 0.5, move: 0.8, gap: 0.12, hold: 1.6, end: 0.6 };
+const TURN_SIZES = [[1, 1], [1.5, 0.9], [0.75, 1.15], [1.2, 1.2], [1.6, 0.8], [0.9, 0.9], [1.1, 1.35]]; // width, height (× unit); squares become cubes
+// globe-like turns: two full turns about two different axes at once, so the sheet tumbles through many directions and lands where it started
+const TURN_AXES = [[[0, 1, 0], [1, 0, 0]], [[0.3, 1, 0.2], [0, 0, 1]], [[1, 0.4, 0], [0, 1, 0]], [[0, 1, 0.5], [1, 0, 0.3]]].map(pair => pair.map(v => new THREE.Vector3(...v).normalize()));
+const TU = { spin: 2.8, rest: 0.5, move: 0.9, gap: 0.12, hold: 1.6, end: 0.6 };
 function buildTurn(g, base) {
-  g.tu = { o: base.clone(), q0: quatFromDeg(-32, 42, 0) }; // seen from above and to the side, so the stack's depth reads
+  g.tu = { o: base.clone(), q0: quatFromDeg(-28, 38, 0) }; // seen from above and to the side, so the solid's depth reads
   g.dTurn = fogDyn(g, BRAND.LINE.px, 20000, 1);
   g.update = updateTurn;
 }
@@ -807,21 +811,22 @@ function turnTimeline(g) {
   marks.buildEnd = marks.buildStart + build; marks.flatStart = marks.buildEnd + TU.hold; marks.flatEnd = marks.flatStart + build;
   return { N, len: marks.flatEnd + TU.end, ...marks };
 }
-const tuQ = new THREE.Quaternion(), tuQ2 = new THREE.Quaternion(), tuY = new THREE.Vector3(0, 1, 0), tuZ = new THREE.Vector3(0, 0, 1), tuV = new THREE.Vector3();
+const tuQ = new THREE.Quaternion(), tuQ2 = new THREE.Quaternion(), tuZ = new THREE.Vector3(0, 0, 1), tuV = new THREE.Vector3();
 function turnPose(g, TL, T, j, o) {
   // returns false while layer j lies flat on layer 0 (nothing extra to draw)
   const p = g.p, { Hs } = stageDims(), U = Hs * 0.42 * p.size, c = Math.max(0, T), cyc = Math.floor(c / TL.len), t = c - cyc * TL.len;
-  const [sw, sh] = TURN_SIZES[cyc % TURN_SIZES.length], dir = cyc % 2 ? -1 : 1;
-  const spin = dir * Math.PI * 2 * lin(t, 0, TL.spinEnd);                      // one full turn at an even speed
+  const [sw, sh] = TURN_SIZES[cyc % TURN_SIZES.length], [ax1, ax2] = TURN_AXES[cyc % TURN_AXES.length];
+  const a = Math.PI * 2 * lin(t, 0, TL.spinEnd);                                   // even speed
   let e = 0;
   if (t >= TL.buildStart && t < TL.flatStart) e = lin(t, TL.buildStart + j * TU.gap, TL.buildStart + j * TU.gap + TU.move);   // the layers rise one after another
-  else if (t >= TL.flatStart) e = 1 - lin(t, TL.flatStart + (TL.N - 1 - j) * TU.gap, TL.flatStart + (TL.N - 1 - j) * TU.gap + TU.move); // the top one folds down first
+  else if (t >= TL.flatStart) e = 1 - lin(t, TL.flatStart + (TL.N - 1 - j) * TU.gap, TL.flatStart + (TL.N - 1 - j) * TU.gap + TU.move); // the top one comes down first
   if (j > 0 && e <= 0) return false;
-  const depth = U * 0.12 * (p.stackGap ?? 1), tw = THREE.MathUtils.degToRad(p.stackTwist ?? 6);
-  tuQ.copy(g.tu.q0).multiply(tuQ2.setFromAxisAngle(tuY, spin));                // the sheet's own frame
-  o.q.copy(tuQ).multiply(tuQ2.setFromAxisAngle(tuZ, tw * j * e));              // each layer turned a little further as it stacks
-  const mid = depth * (TL.N - 1) / 2 * (t >= TL.buildStart ? lin(t, TL.buildStart, TL.buildEnd) * (t < TL.flatStart ? 1 : 1 - lin(t, TL.flatStart, TL.flatEnd)) : 0);
-  tuV.set(0, 0, depth * j * e - mid).applyQuaternion(tuQ);                       // the stack stays centred as it grows
+  tuQ.copy(g.tu.q0).multiply(tuQ2.setFromAxisAngle(ax1, a)).multiply(tuQ2.setFromAxisAngle(ax2, a)); // the sheet's own frame, tumbling like a globe
+  o.q.copy(tuQ).multiply(tuQ2.setFromAxisAngle(tuZ, Math.PI * (1 - e) * (j > 0 ? 1 : 0))); // a layer turns half a turn as it rises and lands square on the one below
+  // the stack ends as a box: a square sheet becomes a cube, a rectangle a box as deep as its short side
+  const D = Math.min(sw, sh) * U * (p.stackGap ?? 1), step = TL.N > 1 ? D / (TL.N - 1) : 0;
+  const grow = t >= TL.buildStart ? lin(t, TL.buildStart, TL.buildEnd) * (t < TL.flatStart ? 1 : 1 - lin(t, TL.flatStart, TL.flatEnd)) : 0;
+  tuV.set(0, 0, step * j * e - D / 2 * grow).applyQuaternion(tuQ);                   // the box stays centred as it grows
   o.pos.copy(g.tu.o).add(tuV); o.w = sw * U; o.h = sh * U;
   return true;
 }
