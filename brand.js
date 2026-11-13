@@ -70,7 +70,7 @@ export const CATEGORIES = [
     shape: { ko: '공간에서 펼쳐지는 다양한 스크린', en: 'Many screens unfolding in space' },
     rule: { ko: '스크린이 펼쳐지고 모양이 변화하며, 지나간 장면은 잔상으로 남긴다', en: 'Screens unfold and change shape, leaving past scenes behind as echoes' },
     ref: { ko: '재생되는 스크린과 흐르는 시간', en: 'A playing screen and running time' },
-    defaults: { ...COMMON, layers: 6, stackGap: 1, size: 1, colorShift: 0.8, duration: 1.1, interval: 1, swing: 55, path: 'curve', quant: 0, screenW: 1, screenH: 1, screenD: 0.04, startW: 0.55, startH: 0.55, startD: 0.55 },
+    defaults: { ...COMMON, layers: 6, stackGap: 1, size: 1, colorShift: 0.8, echoLength: 14, echoDensity: 2.5, duration: 1.1, interval: 1, swing: 55, path: 'curve', quant: 0, screenW: 1, screenH: 1, screenD: 0.04, startW: 0.55, startH: 0.55, startD: 0.55 },
   },
   {
     id: 'software', motion: 'subpix', gradient: 'blue-mint', camera: 'orbit',

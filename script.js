@@ -2,8 +2,8 @@ import * as THREE from 'three';
 import { LineSegments2 } from 'three/addons/lines/LineSegments2.js';
 import { LineSegmentsGeometry } from 'three/addons/lines/LineSegmentsGeometry.js';
 import { LineMaterial } from 'three/addons/lines/LineMaterial.js';
-import * as BRAND from './brand.js?v=20261113b'; // ?v= makes the browser load fresh copies after an update
-import { I18N } from './i18n.js?v=20261113b';
+import * as BRAND from './brand.js?v=20261113c'; // ?v= makes the browser load fresh copies after an update
+import { I18N } from './i18n.js?v=20261113c';
 
 /* =========================================================
    State
@@ -158,7 +158,8 @@ const MOTION_GROUPS = {
     { key: 'echoes', desc: 'descEchoes', rows: ECHO_ROWS },
   ],
   layers: [
-    { key: 'motion', desc: 'descLayers', rows: [R.layerCount, R.stackGap, R.cutTime, R.interval, R.plateSize] },
+    { key: 'motion', desc: 'descLayers', rows: [R.layerCount, R.stackGap, R.plateSize] },
+    { key: 'echoes', desc: 'descEchoes', rows: [R.echoLength, R.echoDensity, R.echoOpacity, R.colorShift, R.air] },
   ],
   format: [
     { key: 'motion', desc: 'descFormat', rows: [R.count, R.behaviour, R.aspect, R.smallest, R.cutTime, R.interval, R.plateSize, R.thickness] },
@@ -712,47 +713,71 @@ const RIG_Q = {};
 Object.entries(RIG).forEach(([k, list]) => { RIG_Q[k] = list.map(r => quatFromDeg(r[6], r[5], 0)); });
 function buildLayers(g, base, W0) {
   g.ly = { o: base.clone(), qStack: quatFromDeg(-14, 38, 0) };
-  g.dLayers = fogDyn(g, BRAND.LINE.px, 900, 1);
+  g.dLayers = fogDyn(g, BRAND.LINE.px, 16000, 1);
   g.update = updateLayers;
 }
 const lyA = { pos: new THREE.Vector3(), q: new THREE.Quaternion(), w: 0, h: 0 }, lyB = { pos: new THREE.Vector3(), q: new THREE.Quaternion(), w: 0, h: 0 };
 const lyCorners = [new THREE.Vector3(), new THREE.Vector3(), new THREE.Vector3(), new THREE.Vector3()], lyC = new THREE.Color(), lyF = new THREE.Color();
 const RIGS_PER_ROUND = 4;
+// fixed timing: every move runs at the same speed, so a still frame (PNG) always shows the same evenly spaced echoes
+const LY_MOVE = 1.6, LY_HOLD = 1.2;
 function layersTimeline(g) {
-  const p = g.p, N = Math.round(p.layers || 6), m = p.duration, h = p.interval, st = m * 0.14, S = st * (N - 1);
+  const p = g.p, N = Math.round(p.layers || 6), m = LY_MOVE, h = LY_HOLD, st = m * 0.14, S = st * (N - 1);
   // stack · set up in the room · hold · change · hold · change · hold · change · hold · stack up again
   const seg = [['stack', h], ['toRig', m + S]];
   for (let k = 0; k < RIGS_PER_ROUND; k++) { seg.push(['hold', h, k]); if (k < RIGS_PER_ROUND - 1) seg.push(['morph', m, k]); }
   seg.push(['toStack', m + S]);
   return { N, m, h, st, seg, len: seg.reduce((a, s) => a + s[1], 0) };
 }
-function updateLayers(g, T) {
-  const p = g.p, L = g.ly, TL = layersTimeline(g), N = TL.N, { Ws, Hs } = stageDims();
+const lin = (x, a, b) => clamp01((x - a) / (b - a)); // constant speed from a to b
+function layerPose(g, TL, T, i, o) {
+  const L = g.ly, N = TL.N, { Hs } = stageDims(), p = g.p;
   const BH = Hs * 0.42 * p.size, BW = BH * A169, SW = BW * 0.62, SH = BH * 0.62;
   const c = Math.max(0, T), cyc = Math.floor(c / TL.len);
   let t = c - cyc * TL.len, si = 0;
   while (si < TL.seg.length - 1 && t >= TL.seg[si][1]) { t -= TL.seg[si][1]; si++; }
   const round = RIG_SEQ[cyc % RIG_SEQ.length], rig = k => round[Math.min(RIGS_PER_ROUND - 1, k)];
-  const gap = (p.stackGap ?? 1), step = new THREE.Vector3(BW * 0.06 * gap, BH * 0.07 * gap, -BW * 0.13 * gap);
-  const stackPose = (i, o) => { const k = i - (N - 1) / 2; o.pos.set(L.o.x + step.x * k, L.o.y + step.y * k, L.o.z + step.z * i); o.q.copy(L.qStack); o.w = SW; o.h = SH; return o; }; // centred, stepping back into depth
-  const rigPose = (name, i, o) => { const list = RIG[name], j = i % list.length, r = list[j]; o.pos.set(L.o.x + r[0] * BH, L.o.y + r[1] * BH, L.o.z + r[2] * BH); o.q.copy(RIG_Q[name][j]); o.w = r[3] * BH; o.h = r[4] * BH; return o; };
-  const S = THREE.MathUtils.smootherstep, [kind, , k] = TL.seg[si];
-  dynBegin(g.dLayers);
+  const gap = (p.stackGap ?? 1);
+  const stackPose = (q) => { const k = i - (N - 1) / 2; q.pos.set(L.o.x + BW * 0.06 * gap * k, L.o.y + BH * 0.07 * gap * k, L.o.z - BW * 0.13 * gap * i); q.q.copy(L.qStack); q.w = SW; q.h = SH; return q; };
+  const rigPose = (name, q) => { const list = RIG[name], j = i % list.length, r = list[j]; q.pos.set(L.o.x + r[0] * BH, L.o.y + r[1] * BH, L.o.z + r[2] * BH); q.q.copy(RIG_Q[name][j]); q.w = r[3] * BH; q.h = r[4] * BH; return q; };
+  const [kind, , k] = TL.seg[si];
+  let e = 0;
+  if (kind === 'stack') stackPose(o);
+  else if (kind === 'toRig') { stackPose(o); rigPose(rig(0), lyB); e = lin(t, i * TL.st, i * TL.st + TL.m); }                       // the front layer goes first
+  else if (kind === 'toStack') { rigPose(rig(RIGS_PER_ROUND - 1), o); stackPose(lyB); e = lin(t, (N - 1 - i) * TL.st, (N - 1 - i) * TL.st + TL.m); } // the back layer lifts off first
+  else if (kind === 'hold') rigPose(rig(k), o);
+  else { rigPose(rig(k), o); rigPose(rig(k + 1), lyB); e = lin(t, 0, TL.m); }
+  if (e > 0) { o.pos.lerp(lyB.pos, e); o.q.slerp(lyB.q, e); o.w += (lyB.w - o.w) * e; o.h += (lyB.h - o.h) * e; }
+  return o;
+}
+const lyP = { pos: new THREE.Vector3(), q: new THREE.Quaternion(), w: 0, h: 0 };
+function layerRect(d, b, P, col) {
+  const hw = P.w / 2, hh = P.h / 2;
+  [[-hw, -hh], [hw, -hh], [hw, hh], [-hw, hh]].forEach(([x, y], q) => lyCorners[q].set(x, y, 0).applyQuaternion(P.q).add(P.pos));
+  for (let q = 0; q < 4; q++) dynSeg(d, b, lyCorners[q], lyCorners[(q + 1) % 4], col);
+}
+function updateLayers(g, T) {
+  const p = g.p, TL = layersTimeline(g), N = TL.N, d = g.dLayers;
+  const Lh = Math.min(40, Math.round(p.echoLength)), dt = 0.25 / p.echoDensity, E = BRAND.ECHO; // few, clearly separate copies: ta-da-da-dak
+  dynBegin(d);
   for (let i = 0; i < N; i++) {
-    let e = 0;
-    if (kind === 'stack') stackPose(i, lyA);
-    else if (kind === 'toRig') { stackPose(i, lyA); rigPose(rig(0), i, lyB); e = S(t, i * TL.st, i * TL.st + TL.m); }                   // the front layer goes first
-    else if (kind === 'toStack') { rigPose(rig(RIGS_PER_ROUND - 1), i, lyA); stackPose(i, lyB); e = S(t, (N - 1 - i) * TL.st, (N - 1 - i) * TL.st + TL.m); } // the back layer lifts off first
-    else if (kind === 'hold') rigPose(rig(k), i, lyA);
-    else { rigPose(rig(k), i, lyA); rigPose(rig(k + 1), i, lyB); e = S(t, 0, TL.m); }
-    if (e > 0) { lyA.pos.lerp(lyB.pos, e); lyA.q.slerp(lyB.q, e); lyA.w += (lyB.w - lyA.w) * e; lyA.h += (lyB.h - lyA.h) * e; }
-    const col = airy(lyC.copy(gcol(g, (N > 1 ? i / (N - 1) : 0) * p.colorShift)), (p.air ?? 0) * 0.5 * (i / Math.max(1, N - 1)));
-    const hw = lyA.w / 2, hh = lyA.h / 2;
-    [[-hw, -hh], [hw, -hh], [hw, hh], [-hw, hh]].forEach(([x, y], q) => lyCorners[q].set(x, y, 0).applyQuaternion(lyA.q).add(lyA.pos));
-    const b = fogB(0.95);
-    for (let q = 0; q < 4; q++) dynSeg(g.dLayers, b, lyCorners[q], lyCorners[(q + 1) % 4], col);
+    const base = (N > 1 ? i / (N - 1) : 0) * p.colorShift;
+    // echoes: where the screen was a moment ago, drawn oldest first; only while it is (or just was) moving
+    lyP.w = -1;
+    for (let k = Lh; k >= 1; k--) {
+      layerPose(g, TL, T - k * dt, i, lyA);
+      const moved = lyP.w < 0 ? 1 : lyA.pos.distanceTo(lyP.pos) + Math.abs(lyA.w - lyP.w) + Math.abs(lyA.h - lyP.h) + (1 - Math.abs(lyA.q.dot(lyP.q))) * 40;
+      lyP.pos.copy(lyA.pos); lyP.q.copy(lyA.q); lyP.w = lyA.w; lyP.h = lyA.h;
+      if (moved < 0.004 || k === Lh) continue; // still: no echo
+      const age = k / Lh, b = fogB(Math.min(1, 0.55 * Math.pow(1 - age, E.falloff) * p.echoOpacity));
+      if (b < 0) continue;
+      const col = airy(lyC.copy(gcol(g, base + (1 - base) * age * p.colorShift)), (p.air ?? 0) * 0.85 * Math.pow(age, 0.7));
+      layerRect(d, b, lyA, col);
+    }
+    layerPose(g, TL, T, i, lyA);
+    layerRect(d, fogB(0.95), lyA, airy(lyC.copy(gcol(g, base)), 0));
   }
-  dynEnd(g.dLayers);
+  dynEnd(d);
 }
 const easeSnap = x => (x < 0.5 ? 8 * x * x * x * x : 1 - Math.pow(-2 * x + 2, 4) / 2); // quick, clean move with no bounce
 const lerpRect = (a, b, e) => ({ x0: a.x0 + (b.x0 - a.x0) * e, x1: a.x1 + (b.x1 - a.x1) * e, y0: a.y0 + (b.y0 - a.y0) * e, y1: a.y1 + (b.y1 - a.y1) * e });
