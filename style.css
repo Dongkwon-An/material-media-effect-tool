@@ -6,7 +6,7 @@
 }
 * { box-sizing: border-box; }
 html, body { height: 100%; margin: 0; }
-body { background: var(--ui-white); color: var(--ui-black); font-family: var(--font-ui); font-size: 12px; }
+body { background: var(--ui-white); color: var(--ui-black); font-family: var(--font-ui); font-size: 12px; -webkit-hyphens: none; hyphens: none; word-break: keep-all; overflow-wrap: break-word; } /* no hyphens; Korean words never split across lines */
 button { font: inherit; color: inherit; }
 
 .window { display: flex; flex-direction: column; height: 100vh; border: 1px solid var(--ui-grey); }
