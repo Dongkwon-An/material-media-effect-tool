@@ -2,8 +2,8 @@ import * as THREE from 'three';
 import { LineSegments2 } from 'three/addons/lines/LineSegments2.js';
 import { LineSegmentsGeometry } from 'three/addons/lines/LineSegmentsGeometry.js';
 import { LineMaterial } from 'three/addons/lines/LineMaterial.js';
-import * as BRAND from './brand.js?v=20261113h'; // ?v= makes the browser load fresh copies after an update
-import { I18N } from './i18n.js?v=20261113h';
+import * as BRAND from './brand.js?v=20261113i'; // ?v= makes the browser load fresh copies after an update
+import { I18N } from './i18n.js?v=20261113i';
 
 /* =========================================================
    State
@@ -799,7 +799,7 @@ function updateLayers(g, T) {
 const TURN_SIZES = [[1.3, 1.3], [0.5, 0.5], [2.0, 0.7], [0.6, 1.5], [0.9, 0.9], [1.8, 1.1], [0.45, 0.8], [1.6, 1.6], [0.8, 0.35]]; // width, height (× unit); squares become cubes
 // globe-like turns: two full turns about two different axes at once, so the sheet tumbles through many directions and lands where it started
 const TURN_AXES = [[[0, 1, 0], [1, 0, 0]], [[0.3, 1, 0.2], [0, 0, 1]], [[1, 0.4, 0], [0, 1, 0]], [[0, 1, 0.5], [1, 0, 0.3]]].map(pair => pair.map(v => new THREE.Vector3(...v).normalize()));
-const TU = { spin: 5.2, rest: 0.5, move: 0.9, gap: 0.12, hold: 1.6, end: 0.6 };
+const TU = { spin: 3.6, rest: 0.5, move: 0.9, gap: 0.12, hold: 1.6, end: 0.6 };
 function buildTurn(g, base) {
   g.tu = { o: base.clone(), q0: quatFromDeg(-28, 38, 0) }; // seen from above and to the side, so the solid's depth reads
   g.dTurn = fogDyn(g, BRAND.LINE.px, 20000, 1);
@@ -815,7 +815,10 @@ const tuQ = new THREE.Quaternion(), tuQ2 = new THREE.Quaternion(), tuZ = new THR
 function turnPose(g, TL, T, j, o) {
   // returns false while layer j lies flat on layer 0 (nothing extra to draw)
   const p = g.p, { Hs } = stageDims(), U = Hs * 0.42 * p.size, c = Math.max(0, T), cyc = Math.floor(c / TL.len), t = c - cyc * TL.len;
-  const [sw, sh] = TURN_SIZES[cyc % TURN_SIZES.length], [ax1, ax2] = TURN_AXES[cyc % TURN_AXES.length];
+  // the size flows smoothly from last round's rectangle to this round's while the sheet turns
+  const [w1, h1] = TURN_SIZES[cyc % TURN_SIZES.length], [w0, h0] = cyc > 0 ? TURN_SIZES[(cyc - 1) % TURN_SIZES.length] : [w1, h1];
+  const m = THREE.MathUtils.smootherstep(t, 0, TL.spinEnd * 0.8), sw = w0 + (w1 - w0) * m, sh = h0 + (h1 - h0) * m;
+  const [ax1, ax2] = TURN_AXES[cyc % TURN_AXES.length];
   const a = Math.PI * 2 * lin(t, 0, TL.spinEnd);                                   // even speed
   let e = 0;
   if (t >= TL.buildStart && t < TL.flatStart) e = lin(t, TL.buildStart + j * TU.gap, TL.buildStart + j * TU.gap + TU.move);   // the layers rise one after another
