@@ -2,8 +2,8 @@ import * as THREE from 'three';
 import { LineSegments2 } from 'three/addons/lines/LineSegments2.js';
 import { LineSegmentsGeometry } from 'three/addons/lines/LineSegmentsGeometry.js';
 import { LineMaterial } from 'three/addons/lines/LineMaterial.js';
-import * as BRAND from './brand.js?v=20261113k'; // ?v= makes the browser load fresh copies after an update
-import { I18N } from './i18n.js?v=20261113k';
+import * as BRAND from './brand.js?v=20261113l'; // ?v= makes the browser load fresh copies after an update
+import { I18N } from './i18n.js?v=20261113l';
 
 /* =========================================================
    State
@@ -245,7 +245,7 @@ function categoryInfoHTML(c) {
   const g = gradientById(c.gradient);
   return `<dl class="info">
     <dt>${t('infoTypes')}</dt><dd>${L(c.types)}</dd>
-    <dt>${t('infoColor')}</dt><dd><span class="info-grad" style="background:${gradCss(c)}"></span>${catColors(c).map(colorName).join(' → ')}</dd>
+    <dt>${t('infoColor')}</dt><dd><span class="info-grad" style="background:${gradCss(c)}"></span>${catColors(c).map(colorName).filter((n, i, a) => n !== a[i - 1]).join(' → ')}</dd>
     <dt>${t('infoShape')}</dt><dd>${L(c.shape)}</dd>
     <dt>${t('infoRule')}</dt><dd>${L(c.rule)}</dd>
   </dl>`;

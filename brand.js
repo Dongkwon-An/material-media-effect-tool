@@ -116,6 +116,7 @@ export const CATEGORIES = [
   },
   {
     id: 'digital', motion: 'turn', gradient: 'violet-magenta', camera: 'orbit', fit: 1,
+    colors: ['#7E00FF', '#7E00FF', '#F902A5'], stops: [0, 0.45, 1], // violet holds for the first part, so it takes up more of the picture
     name: { ko: '디지털 2D 3D 이미지', en: 'Digital 2D/3D Image' },
     types: { ko: '디지털 이미지 · 디지털 그래픽', en: 'Digital image · Digital graphic' },
     basis: { ko: '출력물·실물 + 원본 디지털 파일', en: 'Print or object + source digital file' },
