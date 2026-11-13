@@ -2,8 +2,8 @@ import * as THREE from 'three';
 import { LineSegments2 } from 'three/addons/lines/LineSegments2.js';
 import { LineSegmentsGeometry } from 'three/addons/lines/LineSegmentsGeometry.js';
 import { LineMaterial } from 'three/addons/lines/LineMaterial.js';
-import * as BRAND from './brand.js?v=20261113d'; // ?v= makes the browser load fresh copies after an update
-import { I18N } from './i18n.js?v=20261113d';
+import * as BRAND from './brand.js?v=20261113e'; // ?v= makes the browser load fresh copies after an update
+import { I18N } from './i18n.js?v=20261113e';
 
 /* =========================================================
    State
@@ -100,6 +100,8 @@ const R = {
   cutTime: { k: 'duration', c: true, type: 'range', label: 'cutTime', min: 0.3, max: 4, step: 0.05, unit: 's' },
   // digital image: layers
   layerCount: { k: 'layers', c: true, type: 'range', label: 'layerCount', min: 2, max: 10, step: 1 },
+  stackTwist: { k: 'stackTwist', c: true, type: 'range', label: 'stackTwist', min: 0, max: 20, step: 0.5, unit: '°' },
+  turnLayers: { k: 'layers', c: true, type: 'range', label: 'layerCount', min: 3, max: 24, step: 1 },
   stackGap: { k: 'stackGap', c: true, type: 'range', label: 'stackGap', min: 0.3, max: 2.5, step: 0.05, unit: '×' },
   // screens
   screenW: { k: 'screenW', c: true, type: 'range', label: 'screenW', min: 0.4, max: 2, step: 0.05, unit: '×' },
@@ -161,6 +163,10 @@ const MOTION_GROUPS = {
     { key: 'motion', desc: 'descLayers', rows: [R.layerCount, R.stackGap, R.plateSize] },
     { key: 'echoes', desc: 'descEchoes', rows: [R.echoLength, R.echoDensity, R.echoOpacity, R.colorShift, R.air] },
   ],
+  turn: [
+    { key: 'motion', desc: 'descTurn', rows: [R.turnLayers, R.stackTwist, R.stackGap, R.plateSize] },
+    { key: 'echoes', desc: 'descEchoes', rows: [R.echoLength, R.echoDensity, R.echoOpacity, R.colorShift, R.air] },
+  ],
   format: [
     { key: 'motion', desc: 'descFormat', rows: [R.count, R.behaviour, R.aspect, R.smallest, R.cutTime, R.interval, R.plateSize, R.thickness] },
   ],
@@ -186,7 +192,7 @@ const GLOBAL_SECTIONS = [
   ] },
 ];
 const CAMERA_KEYS = new Set(['camera', 'camDist', 'returnFront', 'panX', 'panY']);
-const LIVE_CAT_KEYS = new Set(['echoDensity', 'echoOpacity', 'colorShift', 'distanceFade', 'echoLength', 'reverse', 'lineColor', 'history', 'layerDepth', 'air', 'glow', 'hold', 'transition', 'bpm', 'accent', 'twist', 'ribbon', 'ribbonWidth', 'cropMarks', 'tick', 'gap', 'turnRate', 'layers', 'stackGap']);
+const LIVE_CAT_KEYS = new Set(['echoDensity', 'echoOpacity', 'colorShift', 'distanceFade', 'echoLength', 'reverse', 'lineColor', 'history', 'layerDepth', 'air', 'glow', 'hold', 'transition', 'bpm', 'accent', 'twist', 'ribbon', 'ribbonWidth', 'cropMarks', 'tick', 'gap', 'turnRate', 'layers', 'stackGap', 'stackTwist']);
 
 /* =========================================================
    Sidebar rendering
@@ -546,6 +552,7 @@ function buildCategory(id) {
     }
   } else if (cat.motion === 'format') buildFormat(g, base, W0, common);
   else if (cat.motion === 'layers') buildLayers(g, base, W0);
+  else if (cat.motion === 'turn') buildTurn(g, base, W0);
   else if (cat.motion === 'net') buildNet(g, base, W0);
   else if (cat.motion === 'grid') buildGrid(g, base, W0);
   else if (cat.motion === 'dance') buildDance(g, base, W0);
@@ -777,6 +784,65 @@ function updateLayers(g, T) {
     }
     layerPose(g, TL, T, i, lyA);
     layerRect(d, fogB(0.95), lyA, airy(lyC.copy(gcol(g, base)), 0));
+  }
+  dynEnd(d);
+}
+/* ---------------------------------------------------------
+   Digital image: a flat sheet (a different rectangle or square
+   every round) turns a full 360°, leaving stepped echoes; then
+   layers stack up out of it, each turned a little further, so the
+   flat image becomes a solid; then the layers fold back down and
+   it is flat again. Fixed timing, so still frames always match.
+   --------------------------------------------------------- */
+const TURN_SIZES = [[1, 1], [1.5, 0.95], [0.7, 1.1], [1.25, 1.25], [1.7, 0.75], [0.85, 0.85], [1.1, 1.4]]; // width, height (× unit)
+const TU = { spin: 2.4, rest: 0.5, move: 0.8, gap: 0.12, hold: 1.6, end: 0.6 };
+function buildTurn(g, base) {
+  g.tu = { o: base.clone(), q0: quatFromDeg(-32, 42, 0) }; // seen from above and to the side, so the stack's depth reads
+  g.dTurn = fogDyn(g, BRAND.LINE.px, 20000, 1);
+  g.update = updateTurn;
+}
+function turnTimeline(g) {
+  const N = Math.round(g.p.layers || 12), build = TU.move + TU.gap * (N - 1);
+  const marks = { spinEnd: TU.spin, buildStart: TU.spin + TU.rest };
+  marks.buildEnd = marks.buildStart + build; marks.flatStart = marks.buildEnd + TU.hold; marks.flatEnd = marks.flatStart + build;
+  return { N, len: marks.flatEnd + TU.end, ...marks };
+}
+const tuQ = new THREE.Quaternion(), tuQ2 = new THREE.Quaternion(), tuY = new THREE.Vector3(0, 1, 0), tuZ = new THREE.Vector3(0, 0, 1), tuV = new THREE.Vector3();
+function turnPose(g, TL, T, j, o) {
+  // returns false while layer j lies flat on layer 0 (nothing extra to draw)
+  const p = g.p, { Hs } = stageDims(), U = Hs * 0.42 * p.size, c = Math.max(0, T), cyc = Math.floor(c / TL.len), t = c - cyc * TL.len;
+  const [sw, sh] = TURN_SIZES[cyc % TURN_SIZES.length], dir = cyc % 2 ? -1 : 1;
+  const spin = dir * Math.PI * 2 * lin(t, 0, TL.spinEnd);                      // one full turn at an even speed
+  let e = 0;
+  if (t >= TL.buildStart && t < TL.flatStart) e = lin(t, TL.buildStart + j * TU.gap, TL.buildStart + j * TU.gap + TU.move);   // the layers rise one after another
+  else if (t >= TL.flatStart) e = 1 - lin(t, TL.flatStart + (TL.N - 1 - j) * TU.gap, TL.flatStart + (TL.N - 1 - j) * TU.gap + TU.move); // the top one folds down first
+  if (j > 0 && e <= 0) return false;
+  const depth = U * 0.12 * (p.stackGap ?? 1), tw = THREE.MathUtils.degToRad(p.stackTwist ?? 6);
+  tuQ.copy(g.tu.q0).multiply(tuQ2.setFromAxisAngle(tuY, spin));                // the sheet's own frame
+  o.q.copy(tuQ).multiply(tuQ2.setFromAxisAngle(tuZ, tw * j * e));              // each layer turned a little further as it stacks
+  const mid = depth * (TL.N - 1) / 2 * (t >= TL.buildStart ? lin(t, TL.buildStart, TL.buildEnd) * (t < TL.flatStart ? 1 : 1 - lin(t, TL.flatStart, TL.flatEnd)) : 0);
+  tuV.set(0, 0, depth * j * e - mid).applyQuaternion(tuQ);                       // the stack stays centred as it grows
+  o.pos.copy(g.tu.o).add(tuV); o.w = sw * U; o.h = sh * U;
+  return true;
+}
+const tuA = { pos: new THREE.Vector3(), q: new THREE.Quaternion(), w: 0, h: 0 }, tuP = { pos: new THREE.Vector3(), q: new THREE.Quaternion(), w: -1, h: 0 };
+function updateTurn(g, T) {
+  const p = g.p, TL = turnTimeline(g), N = TL.N, d = g.dTurn;
+  const Lh = Math.min(40, Math.round(p.echoLength)), dt = 0.25 / p.echoDensity, E = BRAND.ECHO;
+  dynBegin(d);
+  for (let j = 0; j < N; j++) {
+    const base = (N > 1 ? j / (N - 1) : 0) * p.colorShift;
+    tuP.w = -1;
+    for (let k = Lh; k >= 1; k--) { // stepped echoes, oldest first, only where the layer was moving
+      if (!turnPose(g, TL, T - k * dt, j, tuA)) { tuP.w = -1; continue; }
+      const moved = tuP.w < 0 ? 0 : tuA.pos.distanceTo(tuP.pos) + Math.abs(tuA.w - tuP.w) + Math.abs(tuA.h - tuP.h) + (1 - Math.abs(tuA.q.dot(tuP.q))) * 40;
+      tuP.pos.copy(tuA.pos); tuP.q.copy(tuA.q); tuP.w = tuA.w; tuP.h = tuA.h;
+      if (moved < 0.004) continue;
+      const age = k / Lh, b = fogB(Math.min(1, 0.55 * Math.pow(1 - age, E.falloff) * p.echoOpacity));
+      if (b < 0) continue;
+      layerRect(d, b, tuA, airy(lyC.copy(gcol(g, base + (1 - base) * age * p.colorShift)), (p.air ?? 0) * 0.85 * Math.pow(age, 0.7)));
+    }
+    if (turnPose(g, TL, T, j, tuA)) layerRect(d, fogB(0.95), tuA, lyC.copy(gcol(g, base)));
   }
   dynEnd(d);
 }

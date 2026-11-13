@@ -115,14 +115,14 @@ export const CATEGORIES = [
     defaults: { ...COMMON, count: 4, behaviour: 'canon', bpm: 84, accent: 0, amplitude: 1.2, twist: 0.6, spread: 1, ribbon: 5, ribbonWidth: 1, strands: 4, echoOpacity: 1, colorShift: 0.8, air: 0.5 },
   },
   {
-    id: 'digital', motion: 'format', gradient: 'violet-magenta', camera: 'orbit', fit: 1,
+    id: 'digital', motion: 'turn', gradient: 'violet-magenta', camera: 'orbit', fit: 1,
     name: { ko: '디지털 이미지', en: 'Digital Image' },
     types: { ko: '디지털 이미지 · 디지털 그래픽', en: 'Digital image · Digital graphic' },
     basis: { ko: '출력물·실물 + 원본 디지털 파일', en: 'Print or object + source digital file' },
-    shape: { ko: '다양한 크기의 판형', en: 'Paper formats in many sizes' },
-    rule: { ko: '여러 스크린이 크기를 자유롭게 바꾸어 간다', en: 'Screens change their size freely' },
-    ref: { ko: '화면 비율(16:9, 3:2, 4:3, 1:1, 4:5, 9:16)', en: 'Screen aspect ratios (16:9, 3:2, 4:3, 1:1, 4:5, 9:16)' },
-    defaults: { ...COMMON, count: 1, aspect: 'mix', steps: 4, duration: 0.9, interval: 0.9, size: 1, echoLength: 16, echoDensity: 3.5, colorShift: 0.7 },
+    shape: { ko: '크기가 바뀌는 평면 사각형', en: 'A flat rectangle that changes size' },
+    rule: { ko: '평면의 사각형이 360도 회전하며 잔상을 남기고, 레이어가 돌아가며 쌓여 입체가 되었다가 다시 평평해진다', en: 'A flat rectangle turns a full 360°, leaving echoes; layers stack up, each turned a little further, into a solid, then fold flat again' },
+    ref: { ko: '이미지를 이루는 레이어, 평면과 입체를 오가는 디지털 이미지', en: 'The layers an image is made of; digital images moving between flat and solid' },
+    defaults: { ...COMMON, count: 1, aspect: 'mix', steps: 4, duration: 0.9, interval: 0.9, layers: 12, stackTwist: 6, stackGap: 1, size: 1, echoLength: 14, echoDensity: 2.5, colorShift: 0.8 },
   },
 ];
 
