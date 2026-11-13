@@ -2,8 +2,8 @@ import * as THREE from 'three';
 import { LineSegments2 } from 'three/addons/lines/LineSegments2.js';
 import { LineSegmentsGeometry } from 'three/addons/lines/LineSegmentsGeometry.js';
 import { LineMaterial } from 'three/addons/lines/LineMaterial.js';
-import * as BRAND from './brand.js?v=20261113f'; // ?v= makes the browser load fresh copies after an update
-import { I18N } from './i18n.js?v=20261113f';
+import * as BRAND from './brand.js?v=20261113g'; // ?v= makes the browser load fresh copies after an update
+import { I18N } from './i18n.js?v=20261113g';
 
 /* =========================================================
    State
@@ -101,7 +101,7 @@ const R = {
   // digital image: layers
   layerCount: { k: 'layers', c: true, type: 'range', label: 'layerCount', min: 2, max: 10, step: 1 },
   stackTwist: { k: 'stackTwist', c: true, type: 'range', label: 'stackTwist', min: 0, max: 20, step: 0.5, unit: '°' },
-  turnLayers: { k: 'layers', c: true, type: 'range', label: 'layerCount', min: 3, max: 24, step: 1 },
+  turnLayers: { k: 'layers', c: true, type: 'range', label: 'layerCount', min: 2, max: 12, step: 1 },
   boxDepth: { k: 'stackGap', c: true, type: 'range', label: 'boxDepth', min: 0.3, max: 2, step: 0.05, unit: '×' },
   stackGap: { k: 'stackGap', c: true, type: 'range', label: 'stackGap', min: 0.3, max: 2.5, step: 0.05, unit: '×' },
   // screens
@@ -791,8 +791,8 @@ function updateLayers(g, T) {
 /* ---------------------------------------------------------
    Digital image: a flat sheet (a different rectangle or square
    every round) tumbles through a full turn in many directions, like
-   a globe, leaving stepped echoes; then layers rise out of it, each
-   turning as it climbs and landing square, until the sheet is a box
+   a globe, leaving stepped echoes; then a few layers rise straight
+   out of it, one after another, until the sheet is a box
    (a square becomes a cube); then they come back down and it is flat
    again. Fixed timing, so still frames always match.
    --------------------------------------------------------- */
@@ -806,7 +806,7 @@ function buildTurn(g, base) {
   g.update = updateTurn;
 }
 function turnTimeline(g) {
-  const N = Math.round(g.p.layers || 12), build = TU.move + TU.gap * (N - 1);
+  const N = Math.round(g.p.layers || 5), build = TU.move + TU.gap * (N - 1);
   const marks = { spinEnd: TU.spin, buildStart: TU.spin + TU.rest };
   marks.buildEnd = marks.buildStart + build; marks.flatStart = marks.buildEnd + TU.hold; marks.flatEnd = marks.flatStart + build;
   return { N, len: marks.flatEnd + TU.end, ...marks };
@@ -822,7 +822,7 @@ function turnPose(g, TL, T, j, o) {
   else if (t >= TL.flatStart) e = 1 - lin(t, TL.flatStart + (TL.N - 1 - j) * TU.gap, TL.flatStart + (TL.N - 1 - j) * TU.gap + TU.move); // the top one comes down first
   if (j > 0 && e <= 0) return false;
   tuQ.copy(g.tu.q0).multiply(tuQ2.setFromAxisAngle(ax1, a)).multiply(tuQ2.setFromAxisAngle(ax2, a)); // the sheet's own frame, tumbling like a globe
-  o.q.copy(tuQ).multiply(tuQ2.setFromAxisAngle(tuZ, Math.PI * (1 - e) * (j > 0 ? 1 : 0))); // a layer turns half a turn as it rises and lands square on the one below
+  o.q.copy(tuQ); // layers rise straight up, square on the one below
   // the stack ends as a box: a square sheet becomes a cube, a rectangle a box as deep as its short side
   const D = Math.min(sw, sh) * U * (p.stackGap ?? 1), step = TL.N > 1 ? D / (TL.N - 1) : 0;
   const grow = t >= TL.buildStart ? lin(t, TL.buildStart, TL.buildEnd) * (t < TL.flatStart ? 1 : 1 - lin(t, TL.flatStart, TL.flatEnd)) : 0;

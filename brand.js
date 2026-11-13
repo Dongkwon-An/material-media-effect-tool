@@ -120,9 +120,9 @@ export const CATEGORIES = [
     types: { ko: '디지털 이미지 · 디지털 그래픽', en: 'Digital image · Digital graphic' },
     basis: { ko: '출력물·실물 + 원본 디지털 파일', en: 'Print or object + source digital file' },
     shape: { ko: '크기가 바뀌는 평면 사각형', en: 'A flat rectangle that changes size' },
-    rule: { ko: '평면의 사각형이 지구본처럼 여러 방향으로 360도 회전하며 잔상을 남기고, 레이어가 돌아가며 쌓여 직육면체·정육면체가 되었다가 다시 평평해진다', en: 'A flat rectangle tumbles a full 360° in many directions like a globe, leaving echoes; layers turn as they stack up into a box or cube, then go flat again' },
+    rule: { ko: '평면의 사각형이 지구본처럼 여러 방향으로 360도 회전하며 잔상을 남기고, 레이어가 쌓여 올라가 직육면체·정육면체가 되었다가 다시 평평해진다', en: 'A flat rectangle tumbles a full 360° in many directions like a globe, leaving echoes; layers stack up into a box or cube, then go flat again' },
     ref: { ko: '이미지를 이루는 레이어, 평면과 입체를 오가는 디지털 이미지', en: 'The layers an image is made of; digital images moving between flat and solid' },
-    defaults: { ...COMMON, count: 1, aspect: 'mix', steps: 4, duration: 0.9, interval: 0.9, layers: 12, stackGap: 1, size: 1, echoLength: 14, echoDensity: 2.5, colorShift: 0.8 },
+    defaults: { ...COMMON, count: 1, aspect: 'mix', steps: 4, duration: 0.9, interval: 0.9, layers: 5, stackGap: 1, size: 1, echoLength: 14, echoDensity: 2.5, colorShift: 0.8 },
   },
 ];
 
