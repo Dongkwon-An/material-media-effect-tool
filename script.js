@@ -2,8 +2,8 @@ import * as THREE from 'three';
 import { LineSegments2 } from 'three/addons/lines/LineSegments2.js';
 import { LineSegmentsGeometry } from 'three/addons/lines/LineSegmentsGeometry.js';
 import { LineMaterial } from 'three/addons/lines/LineMaterial.js';
-import * as BRAND from './brand.js?v=20261112u'; // ?v= makes the browser load fresh copies after an update
-import { I18N } from './i18n.js?v=20261112u';
+import * as BRAND from './brand.js?v=20261113a'; // ?v= makes the browser load fresh copies after an update
+import { I18N } from './i18n.js?v=20261113a';
 
 /* =========================================================
    State
@@ -681,68 +681,89 @@ function buildSheet(g, base, W0, common, si, shrink) {
   g.units.push(makeUnit(g, { ...common, index: si, w: A0 * 0.5, E: new THREE.Vector3(), keys, curveSign: 1 }));
 }
 /* ---------------------------------------------------------
-   Digital image: layers. An image is made of see-through layers.
-   The layers stack up on a diagonal; the stack turns to face
-   the viewer and the layers join into one screen, which then
-   changes its make-up (full screen, a tall strip, a small screen,
-   four split screens …); then the layers lift off and stack up
-   on the diagonal again. Lines only, no trail.
+   Moving image & sound: layers of screens. The layers stack up on a
+   diagonal, then go out into a room and are installed there: one
+   projection wall, a long strip, three channels with the side screens
+   turned in, a corner, a video wall, standing or hanging screens …
+   four set-ups in a round; then they lift off and stack up again.
+   A faint floor outline shows the room. Lines only, no trail.
    --------------------------------------------------------- */
-// screen layouts: rectangles as [centre x, centre y, width, height] inside the full-screen box (-0.5 … 0.5)
-const LAYOUTS = {
-  full: [[0, 0, 1, 1]],
-  quad: [[-0.255, 0.255, 0.49, 0.49], [0.255, 0.255, 0.49, 0.49], [-0.255, -0.255, 0.49, 0.49], [0.255, -0.255, 0.49, 0.49]],
-  tall: [[0, 0, 0.26, 1]],
-  pip: [[0, 0, 1, 1], [0.3, -0.27, 0.32, 0.32]],
-  small: [[0, 0, 0.34, 0.34]],
-  split: [[-0.255, 0, 0.49, 1], [0.255, 0, 0.49, 1]],
-  wide: [[0, 0, 1, 0.28]],
-  cols: [[-0.34, 0, 0.3, 1], [0, 0, 0.3, 1], [0.34, 0, 0.3, 1]],
-  side: [[-0.16, 0, 0.66, 1], [0.34, 0.255, 0.3, 0.49], [0.34, -0.255, 0.3, 0.49]],
+// Screen set-ups as they would be installed in a room. Each screen: [x, y, z, width, height, turn (°, about the vertical), tilt (°)],
+// in units of the full screen's height, around the centre of the room; the floor is at y = -0.5.
+const A169 = 16 / 9, TRI = 40, tc = Math.cos(THREE.MathUtils.degToRad(TRI)), ts = Math.sin(THREE.MathUtils.degToRad(TRI));
+const RIG = {
+  full: [[0, 0, 0, A169, 1, 0, 0]],                                                     // one projection wall
+  wide: [[0, -0.05, 0, A169 * 1.15, 0.42, 0, 0]],                                        // a long panorama strip
+  tri: [[0, 0, 0, 0.84, 0.84, 0, 0],                                                     // three-channel: the side screens turn in toward the viewer
+    [-(0.42 + 0.06) - 0.42 * tc, 0, 0.42 * ts, 0.84, 0.84, TRI, 0], [(0.42 + 0.06) + 0.42 * tc, 0, 0.42 * ts, 0.84, 0.84, -TRI, 0]],
+  corner: [[-0.62 * Math.SQRT1_2, 0, -0.62 * Math.SQRT1_2, 1.24, 0.9, 45, 0], [0.62 * Math.SQRT1_2, 0, -0.62 * Math.SQRT1_2, 1.24, 0.9, -45, 0]], // two walls meeting in a corner
+  quad: [[-0.45, 0.255, 0, 0.88, 0.49, 0, 0], [0.45, 0.255, 0, 0.88, 0.49, 0, 0], [-0.45, -0.255, 0, 0.88, 0.49, 0, 0], [0.45, -0.255, 0, 0.88, 0.49, 0, 0]], // a 2×2 video wall
+  tall: [[0, 0, 0, 0.3, 1, 0, 0]],                                                       // one tall standing screen
+  totems: [[-0.9, 0, 0.35, 0.3, 1, 18, 0], [-0.3, 0, -0.15, 0.3, 1, 8, 0], [0.3, 0, -0.65, 0.3, 1, -8, 0], [0.9, 0, -1.15, 0.3, 1, -18, 0]], // tall screens standing in a row into the room
+  hang: [[-0.75, 0.2, 0, 0.7, 0.42, 22, 8], [0.05, 0.3, -0.5, 0.7, 0.42, -6, -6], [0.8, 0.1, 0.1, 0.7, 0.42, -24, 10]], // screens hung from the ceiling at different heights
+  small: [[0, -0.32, 0.2, 0.42, 0.34, 0, 0]],                                            // a single monitor near the floor
+  pip: [[0, 0, -0.3, A169, 1, 0, 0], [0.55, -0.22, 0.25, 0.46, 0.34, -12, 0]],           // a big wall with a small monitor in front of it
+  floorwall: [[0, 0.05, -0.6, A169 * 0.8, 0.9, 0, 0], [0, -0.5, 0.25, A169 * 0.8, 0.9, 0, -90]], // a wall projection that runs on onto the floor
+  room: [[0, 0, -1.05, 1.6, 0.9, 0, 0], [-0.8, 0, -0.45, 1.2, 0.9, 90, 0], [0.8, 0, -0.45, 1.2, 0.9, -90, 0]], // three walls of a room around the viewer
 };
-const LAYOUT_SEQ = ['full', 'quad', 'tall', 'pip', 'small', 'split', 'wide', 'cols', 'side'];
+// four set-ups per round; each round reads as one story (full → strip → three screens → corner …)
+const RIG_SEQ = [['full', 'wide', 'tri', 'corner'], ['quad', 'tall', 'totems', 'hang'], ['small', 'pip', 'floorwall', 'room']];
+const RIG_Q = {};
+Object.entries(RIG).forEach(([k, list]) => { RIG_Q[k] = list.map(r => quatFromDeg(r[6], r[5], 0)); });
 function buildLayers(g, base, W0) {
-  g.ly = { o: base.clone(), qStack: quatFromDeg(-14, 38, 0), q0: new THREE.Quaternion() };
-  g.dLayers = fogDyn(g, BRAND.LINE.px, 600, 1);
+  g.ly = { o: base.clone(), qStack: quatFromDeg(-14, 38, 0) };
+  g.dLayers = fogDyn(g, BRAND.LINE.px, 900, 1);
   g.update = updateLayers;
 }
 const lyA = { pos: new THREE.Vector3(), q: new THREE.Quaternion(), w: 0, h: 0 }, lyB = { pos: new THREE.Vector3(), q: new THREE.Quaternion(), w: 0, h: 0 };
-const lyV = new THREE.Vector3(), lyCorners = [new THREE.Vector3(), new THREE.Vector3(), new THREE.Vector3(), new THREE.Vector3()], lyC = new THREE.Color();
+const lyCorners = [new THREE.Vector3(), new THREE.Vector3(), new THREE.Vector3(), new THREE.Vector3()], lyC = new THREE.Color(), lyF = new THREE.Color();
+const RIGS_PER_ROUND = 4;
 function layersTimeline(g) {
   const p = g.p, N = Math.round(p.layers || 6), m = p.duration, h = p.interval, st = m * 0.14, S = st * (N - 1);
-  // stack · turn front · layout 1 · change · layout 2 · change · layout 3 · stack up again
-  const seg = [['stack', h], ['toFront', m + S], ['hold', h], ['morph', m], ['hold', h], ['morph', m], ['hold', h], ['toStack', m + S]];
+  // stack · set up in the room · hold · change · hold · change · hold · change · hold · stack up again
+  const seg = [['stack', h], ['toRig', m + S]];
+  for (let k = 0; k < RIGS_PER_ROUND; k++) { seg.push(['hold', h, k]); if (k < RIGS_PER_ROUND - 1) seg.push(['morph', m, k]); }
+  seg.push(['toStack', m + S]);
   return { N, m, h, st, seg, len: seg.reduce((a, s) => a + s[1], 0) };
 }
 function updateLayers(g, T) {
   const p = g.p, L = g.ly, TL = layersTimeline(g), N = TL.N, { Ws, Hs } = stageDims();
-  const BW = Ws * 0.56 * p.size, BH = Hs * 0.56 * p.size, SW = BW * 0.62, SH = BH * 0.62;
+  const BH = Hs * 0.42 * p.size, BW = BH * A169, SW = BW * 0.62, SH = BH * 0.62;
   const c = Math.max(0, T), cyc = Math.floor(c / TL.len);
   let t = c - cyc * TL.len, si = 0;
   while (si < TL.seg.length - 1 && t >= TL.seg[si][1]) { t -= TL.seg[si][1]; si++; }
-  const lay = k => LAYOUTS[LAYOUT_SEQ[(cyc * 3 + k) % LAYOUT_SEQ.length]];
+  const round = RIG_SEQ[cyc % RIG_SEQ.length], rig = k => round[Math.min(RIGS_PER_ROUND - 1, k)];
   const gap = (p.stackGap ?? 1), step = new THREE.Vector3(BW * 0.06 * gap, BH * 0.07 * gap, -BW * 0.13 * gap);
-  const stackPose = (i, o) => { const k = i - (N - 1) / 2; o.pos.set(L.o.x + step.x * k, L.o.y + step.y * k, L.o.z + step.z * i); o.q.copy(L.qStack); o.w = SW; o.h = SH; return o; }; // centred on screen, stepping back into depth (never toward the camera)
-  const frontPose = (rects, i, o) => { const r = rects[i % rects.length]; o.pos.set(L.o.x + r[0] * BW, L.o.y + r[1] * BH, L.o.z); o.q.copy(L.q0); o.w = r[2] * BW; o.h = r[3] * BH; return o; };
-  const S = THREE.MathUtils.smootherstep;
+  const stackPose = (i, o) => { const k = i - (N - 1) / 2; o.pos.set(L.o.x + step.x * k, L.o.y + step.y * k, L.o.z + step.z * i); o.q.copy(L.qStack); o.w = SW; o.h = SH; return o; }; // centred, stepping back into depth
+  const rigPose = (name, i, o) => { const list = RIG[name], j = i % list.length, r = list[j]; o.pos.set(L.o.x + r[0] * BH, L.o.y + r[1] * BH, L.o.z + r[2] * BH); o.q.copy(RIG_Q[name][j]); o.w = r[3] * BH; o.h = r[4] * BH; return o; };
+  const S = THREE.MathUtils.smootherstep, [kind, , k] = TL.seg[si];
+  let inRoom = 1; // how much the room (floor) is there
+  if (kind === 'stack') inRoom = 0;
+  else if (kind === 'toRig') inRoom = S(t, 0, TL.m + TL.st * (N - 1));
+  else if (kind === 'toStack') inRoom = 1 - S(t, 0, TL.m + TL.st * (N - 1));
   dynBegin(g.dLayers);
-  for (let i = 0; i < N; i++) {
-    const kind = TL.seg[si][0];
-    let e = 0;
-    if (kind === 'stack') { stackPose(i, lyA); e = 0; }
-    else if (kind === 'toFront') { stackPose(i, lyA); frontPose(lay(0), i, lyB); e = S(t, i * TL.st, i * TL.st + TL.m); }       // the front layer turns first
-    else if (kind === 'toStack') { frontPose(lay(2), i, lyA); stackPose(i, lyB); e = S(t, (N - 1 - i) * TL.st, (N - 1 - i) * TL.st + TL.m); } // the back layer lifts off first, the others land in front of it
-    else {
-      const k = si <= 2 ? 0 : si <= 4 ? 1 : 2;
-      if (kind === 'hold') frontPose(lay(k), i, lyA);
-      else { frontPose(lay(k - 1 < 0 ? 0 : (si === 3 ? 0 : 1)), i, lyA); frontPose(lay(si === 3 ? 1 : 2), i, lyB); e = S(t, 0, TL.m); }
+  // the floor of the room the screens are installed in: a faint outline
+  if (inRoom > 0.02) {
+    const fy = L.o.y - 0.5 * BH, x0 = L.o.x - BW * 0.85, x1 = L.o.x + BW * 0.85, z0 = L.o.z - BH * 1.4, z1 = L.o.z + BH * 0.9;
+    const fc = airy(lyF.copy(gcol(g, 0.5 * p.colorShift)), 0.55), fb = fogB(0.55 * inRoom);
+    if (fb >= 0) {
+      lyCorners[0].set(x0, fy, z1); lyCorners[1].set(x1, fy, z1); lyCorners[2].set(x1, fy, z0); lyCorners[3].set(x0, fy, z0);
+      for (let q = 0; q < 4; q++) dynSeg(g.dLayers, fb, lyCorners[q], lyCorners[(q + 1) % 4], fc);
     }
+  }
+  for (let i = 0; i < N; i++) {
+    let e = 0;
+    if (kind === 'stack') stackPose(i, lyA);
+    else if (kind === 'toRig') { stackPose(i, lyA); rigPose(rig(0), i, lyB); e = S(t, i * TL.st, i * TL.st + TL.m); }                   // the front layer goes first
+    else if (kind === 'toStack') { rigPose(rig(RIGS_PER_ROUND - 1), i, lyA); stackPose(i, lyB); e = S(t, (N - 1 - i) * TL.st, (N - 1 - i) * TL.st + TL.m); } // the back layer lifts off first
+    else if (kind === 'hold') rigPose(rig(k), i, lyA);
+    else { rigPose(rig(k), i, lyA); rigPose(rig(k + 1), i, lyB); e = S(t, 0, TL.m); }
     if (e > 0) { lyA.pos.lerp(lyB.pos, e); lyA.q.slerp(lyB.q, e); lyA.w += (lyB.w - lyA.w) * e; lyA.h += (lyB.h - lyA.h) * e; }
     const col = airy(lyC.copy(gcol(g, (N > 1 ? i / (N - 1) : 0) * p.colorShift)), (p.air ?? 0) * 0.5 * (i / Math.max(1, N - 1)));
     const hw = lyA.w / 2, hh = lyA.h / 2;
-    [[-hw, -hh], [hw, -hh], [hw, hh], [-hw, hh]].forEach(([x, y], k) => lyCorners[k].set(x, y, 0).applyQuaternion(lyA.q).add(lyA.pos));
+    [[-hw, -hh], [hw, -hh], [hw, hh], [-hw, hh]].forEach(([x, y], q) => lyCorners[q].set(x, y, 0).applyQuaternion(lyA.q).add(lyA.pos));
     const b = fogB(0.95);
-    for (let k = 0; k < 4; k++) dynSeg(g.dLayers, b, lyCorners[k], lyCorners[(k + 1) % 4], col);
+    for (let q = 0; q < 4; q++) dynSeg(g.dLayers, b, lyCorners[q], lyCorners[(q + 1) % 4], col);
   }
   dynEnd(g.dLayers);
 }
