@@ -7,7 +7,7 @@ export const BACKGROUNDS = [
   { name: 'White', hex: '#FFFFFF' },
   { name: 'Light Grey', hex: '#EBEBEB' },
   { name: 'Black', hex: '#000000' },
-  { name: 'Material Blue', hex: '#005BD5' },
+  { name: 'Material Blue', hex: '#006DFF' },
   { name: 'Material Electric Violet', hex: '#7E00FF' },
   { name: 'Material Hot Magenta', hex: '#F902A5' },
   { name: 'Material Signal Red', hex: '#EB3328' },
@@ -18,7 +18,7 @@ export const BACKGROUNDS = [
 ];
 
 export const KEY_COLORS = [
-  { id: 'blue', name: 'Material Blue', hex: '#005BD5' },
+  { id: 'blue', name: 'Material Blue', hex: '#006DFF' },
   { id: 'electric-violet', name: 'Material Electric Violet', hex: '#7E00FF' },
   { id: 'hot-magenta', name: 'Material Hot Magenta', hex: '#F902A5' },
   { id: 'signal-red', name: 'Material Signal Red', hex: '#EB3328' },
@@ -29,7 +29,7 @@ export const KEY_COLORS = [
 ];
 
 export const GRADIENTS = [
-  { id: 'blue-mint', name: 'Material Blue Mint', a: '#005BD5', b: '#02FBCA' },
+  { id: 'blue-mint', name: 'Material Blue Mint', a: '#006DFF', b: '#02FBCA' },
   { id: 'violet-mint', name: 'Material Violet Mint', a: '#7E00FF', b: '#02FBCA' },
   { id: 'magenta-saffron', name: 'Material Magenta Saffron', a: '#F902A5', b: '#F8CE47' },
   { id: 'vermilion-yellow', name: 'Material Vermilion Yellow', a: '#EB3328', b: '#E6E938' },
