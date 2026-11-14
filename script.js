@@ -2,8 +2,8 @@ import * as THREE from 'three';
 import { LineSegments2 } from 'three/addons/lines/LineSegments2.js';
 import { LineSegmentsGeometry } from 'three/addons/lines/LineSegmentsGeometry.js';
 import { LineMaterial } from 'three/addons/lines/LineMaterial.js';
-import * as BRAND from './brand.js?v=20261113l'; // ?v= makes the browser load fresh copies after an update
-import { I18N } from './i18n.js?v=20261113l';
+import * as BRAND from './brand.js?v=20261114a'; // ?v= makes the browser load fresh copies after an update
+import { I18N } from './i18n.js?v=20261114a';
 
 /* =========================================================
    State
@@ -185,7 +185,7 @@ const GLOBAL_SECTIONS = [
   ] },
   { key: 'export', desc: null, rows: [
     { k: 'exportSize', type: 'select', label: 'exportSize', opts: Object.keys(BRAND.EXPORT_SIZES).map(v => [v, v]) },
-    { k: 'exportDuration', type: 'select', label: 'exportDuration', opts: [[5, '5s'], [10, '10s'], [15, '15s']], num: true, literalOpts: true },
+    { k: 'exportDuration', type: 'select', label: 'exportDuration', opts: [[5, '5s'], [10, '10s'], [15, '15s'], [30, '30s']], num: true, literalOpts: true },
     { k: 'exportQuality', type: 'select', label: 'exportQuality', opts: [['standard', 'qStandard'], ['high', 'qHigh'], ['max', 'qMax']] },
     { type: 'button', id: 'exportPng', label: 'exportPng' },
     { type: 'button', id: 'exportMp4', label: 'exportMp4' },
