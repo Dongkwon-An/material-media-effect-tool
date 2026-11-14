@@ -2,8 +2,8 @@ import * as THREE from 'three';
 import { LineSegments2 } from 'three/addons/lines/LineSegments2.js';
 import { LineSegmentsGeometry } from 'three/addons/lines/LineSegmentsGeometry.js';
 import { LineMaterial } from 'three/addons/lines/LineMaterial.js';
-import * as BRAND from './brand.js?v=20261114b'; // ?v= makes the browser load fresh copies after an update
-import { I18N } from './i18n.js?v=20261114b';
+import * as BRAND from './brand.js?v=20261114c'; // ?v= makes the browser load fresh copies after an update
+import { I18N } from './i18n.js?v=20261114c';
 
 /* =========================================================
    State
@@ -1926,9 +1926,12 @@ async function exportVideoOffline() {
   enc.configure({ codec: pick.codec, width: W, height: H, bitrate, framerate: fps, latencyMode: 'quality', bitrateMode: 'variable' });
   const btn = document.getElementById('exportMp4');
   try {
+    // record from the moment on screen, so the motion is there from the first frame (clock 0 can sit before
+    // the category's own start and draw nothing for a few seconds)
+    const clock0 = clock, cam0 = camTime;
     for (let i = 0; i < total && !failed; i++) {
-      clock = i / fps;
-      renderFrame(i / fps);
+      clock = clock0 + i / fps;
+      renderFrame(cam0 + i / fps);
       const frame = new VideoFrame(renderer.domElement, { timestamp: Math.round(i * 1e6 / fps), duration: Math.round(1e6 / fps) });
       enc.encode(frame, { keyFrame: i % (fps * 2) === 0 });
       frame.close();
@@ -1960,7 +1963,7 @@ function exportVideoRealtime() {
   const [W, H] = BRAND.EXPORT_SIZES[state.exportSize];
   recording = true; lockExport(true);
   setRenderSize(W, H, 1, false);
-  clock = 0; playing = true; updatePlayIcon();
+  playing = true; updatePlayIcon(); // carry on from the moment on screen, so recording starts with the motion
   const rec = new MediaRecorder(renderer.domElement.captureStream(60), { mimeType: mime, videoBitsPerSecond: QUALITY[state.exportQuality].mbps[W * H > 1920 * 1080 ? 1 : 0] * 1e6 });
   const chunks = [];
   rec.ondataavailable = e => { if (e.data.size) chunks.push(e.data); };
