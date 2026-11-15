@@ -64,6 +64,7 @@ const COMMON = {
 export const CATEGORIES = [
   {
     id: 'moving', motion: 'layers', gradient: 'violet-mint', flip: true, camera: 'low', fit: 1,
+    colors: ['#02FBCA', '#7E00FF', '#7E00FF'], stops: [0, 0.3, 1], // violet takes most of it (mint only at the front), so it never reads like software's blue-mint
     name: { ko: '영상·사운드', en: 'Moving Image & Sound' },
     types: { ko: '필름 · 슬라이드 · 단채널 비디오 · 다채널 비디오 설치 · 사운드 아트', en: 'Film · Slide · Single-channel video · Multi-channel installation · Sound art' },
     basis: { ko: '영상 파일·필름 + 재생 장치', en: 'Video file or film + playback device' },
@@ -74,6 +75,7 @@ export const CATEGORIES = [
   },
   {
     id: 'software', motion: 'subpix', gradient: 'blue-mint', camera: 'orbit', fit: 0.75,
+    colors: ['#006DFF', '#006DFF', '#02FBCA'], stops: [0, 0.5, 1], // blue takes most of it, so it never reads like moving image's violet-mint
     name: { ko: '소프트웨어 기반', en: 'Software-based Art' },
     types: { ko: '소프트웨어·생성형 · AI 기반 · 인터랙티브·센서 · 게임 아트 · 몰입형 XR', en: 'Software / generative · AI-based · Interactive / sensor · Game art · Immersive XR' },
     basis: { ko: '코드 + 실행 환경', en: 'Code + runtime environment' },
