@@ -2,8 +2,8 @@ import * as THREE from 'three';
 import { LineSegments2 } from 'three/addons/lines/LineSegments2.js';
 import { LineSegmentsGeometry } from 'three/addons/lines/LineSegmentsGeometry.js';
 import { LineMaterial } from 'three/addons/lines/LineMaterial.js';
-import * as BRAND from './brand.js?v=20261115e'; // ?v= makes the browser load fresh copies after an update
-import { I18N } from './i18n.js?v=20261115e';
+import * as BRAND from './brand.js?v=20261115f'; // ?v= makes the browser load fresh copies after an update
+import { I18N } from './i18n.js?v=20261115f';
 
 /* =========================================================
    State
@@ -1498,23 +1498,22 @@ function updateSubpix(g, T) {
     if (s < 0.03) continue;
     const fog = fogAt(Math.hypot(x - cp.x, y - cp.y, z - cp.z), fr), b = fogB(0.95 * fog);
     if (b < 0) continue;
-    // every cell carries the gradient itself: blue at its top, running to mint at its bottom (about 80 : 20)
+    // every cell carries the gradient itself, on the diagonal: blue at its top-left corner, mint at its bottom-right (about 80 : 20)
     const air = (p.air ?? 0) * 0.7 * (1 - fog);
-    let top, bot;
-    if (L.shape === 'rect') { top = y + L.h * s / 2; bot = y - L.h * s / 2; }
-    else { top = y + L.r * s; bot = y - L.r * s; }
-    const span = Math.max(1e-6, top - bot);
-    const colAt = (yy, out) => airy(out.copy(gcol(g, clamp01((top - yy) / span) * p.colorShift)), air);
+    const ex = Math.max(1e-6, L.shape === 'rect' ? L.w * s / 2 : L.r * s), ey = Math.max(1e-6, L.shape === 'rect' ? L.h * s / 2 : L.r * s);
+    const top = y + ey;
+    const colAt = (v, out) => airy(out.copy(gcol(g, clamp01(0.5 + ((v.x - x) / ex - (v.y - y) / ey) / 4) * p.colorShift)), air);
     const edge = (ax, ay, bx, by, k) => { // split so the colour follows the gradient's stops along the edge
       for (let q = 0; q < k; q++) {
         const t0 = q / k, t1 = (q + 1) / k;
         _a.set(ax + (bx - ax) * t0, ay + (by - ay) * t0, z); _b.set(ax + (bx - ax) * t1, ay + (by - ay) * t1, z);
-        dynSeg(g.dCells, b, _a, _b, colAt(_a.y, spC), colAt(_b.y, spC2));
+        dynSeg(g.dCells, b, _a, _b, colAt(_a, spC), colAt(_b, spC2));
       }
     };
     if (L.shape === 'rect') {
       const hw = L.w * s / 2;
-      edge(x - hw, top, x + hw, top, 1); edge(x + hw, top, x + hw, bot, 3); edge(x + hw, bot, x - hw, bot, 1); edge(x - hw, bot, x - hw, top, 3);
+      const bot = y - ey;
+      edge(x - hw, top, x + hw, top, 3); edge(x + hw, top, x + hw, bot, 3); edge(x + hw, bot, x - hw, bot, 3); edge(x - hw, bot, x - hw, top, 3);
     } else if (L.shape === 'diamond') {
       const r = L.r * s;
       edge(x, y + r, x + r, y, 3); edge(x + r, y, x, y - r, 3); edge(x, y - r, x - r, y, 3); edge(x - r, y, x, y + r, 3);
