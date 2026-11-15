@@ -75,14 +75,14 @@ export const CATEGORIES = [
   },
   {
     id: 'software', motion: 'subpix', gradient: 'blue-mint', camera: 'orbit', fit: 0.75,
-    colors: ['#006DFF', '#006DFF', '#02FBCA'], stops: [0, 0.7, 1], // blue takes most of it, so it never reads like moving image's violet-mint
+    colors: ['#006DFF', '#006DFF', '#02FBCA'], stops: [0, 0.6, 1], // one screen-wide gradient: about 80% blue, 20% mint
     name: { ko: '소프트웨어 기반', en: 'Software-based Art' },
     types: { ko: '소프트웨어·생성형 · AI 기반 · 인터랙티브·센서 · 게임 아트 · 몰입형 XR', en: 'Software / generative · AI-based · Interactive / sensor · Game art · Immersive XR' },
     basis: { ko: '코드 + 실행 환경', en: 'Code + runtime environment' },
     shape: { ko: '화면을 이루는 가장 작은 빛의 점(서브픽셀) 배열', en: 'The arrays of tiny dots of light (sub-pixels) a screen is made of' },
     rule: { ko: 'TV·PC·LCD 화면의 픽셀이 패턴을 이루고, 화면이 전환되거나 꺼지고 켜질 때 물결, 가운데에서 가장자리, 위에서 아래의 방식으로 바뀐다', en: 'The pixels of TV, PC and LCD screens form a pattern; when the screen changes or turns off and on, they change as a wave, from the centre to the edges, or from top to bottom' },
     ref: { ko: '디스플레이 서브픽셀 구조: 슬롯 마스크(TV CRT), 섀도 마스크(PC CRT), XO-1 LCD, 스트라이프 LCD', en: 'Display sub-pixel layouts: slot mask (TV CRT), shadow mask (PC CRT), XO-1 LCD, stripe LCD' },
-    defaults: { ...COMMON, transition: 'wave', cols: 10, size: 1, hold: 1.6, duration: 0.9, colorShift: 0.9, air: 0.4 },
+    defaults: { ...COMMON, transition: 'wave', cols: 10, size: 1, hold: 1.6, duration: 0.9, colorShift: 1, air: 0.4 },
   },
   {
     id: 'network', motion: 'net', gradient: 'mint-yellow', camera: 'orbit', fit: 1,
