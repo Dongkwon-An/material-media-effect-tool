@@ -2,8 +2,8 @@ import * as THREE from 'three';
 import { LineSegments2 } from 'three/addons/lines/LineSegments2.js';
 import { LineSegmentsGeometry } from 'three/addons/lines/LineSegmentsGeometry.js';
 import { LineMaterial } from 'three/addons/lines/LineMaterial.js';
-import * as BRAND from './brand.js?v=20261115d'; // ?v= makes the browser load fresh copies after an update
-import { I18N } from './i18n.js?v=20261115d';
+import * as BRAND from './brand.js?v=20261115e'; // ?v= makes the browser load fresh copies after an update
+import { I18N } from './i18n.js?v=20261115e';
 
 /* =========================================================
    State
@@ -1459,7 +1459,7 @@ function buildSubpix(g, base, W0) {
   g.dCells = fogDyn(g, BRAND.LINE.px, 70000, 1);
   g.update = updateSubpix;
 }
-const spSh = [0, 0], spC = new THREE.Color(), spV = new THREE.Vector3();
+const spSh = [0, 0], spC = new THREE.Color(), spC2 = new THREE.Color();
 function updateSubpix(g, T) {
   const p = g.p, S = g.sp, hold = p.hold, mv = p.duration, W = hold + 2 * mv;
   const n = Math.floor(Math.max(0, T) / W), local = Math.max(0, T) - n * W, L = S.layouts[n % 4];
@@ -1498,20 +1498,31 @@ function updateSubpix(g, T) {
     if (s < 0.03) continue;
     const fog = fogAt(Math.hypot(x - cp.x, y - cp.y, z - cp.z), fr), b = fogB(0.95 * fog);
     if (b < 0) continue;
-    // one gradient across the whole screen (blue most of the way, mint toward one corner) instead of a colour per pixel
-    spV.set(x, y, z).project(camera);
-    const u = clamp01((spV.x * 0.6 - spV.y * 0.4) * 0.5 + 0.5);
-    const c = airy(spC.copy(gcol(g, u * p.colorShift)), (p.air ?? 0) * 0.7 * (1 - fog));
-    if (L.shape === 'rect') dynRect(g.dCells, b, x, y, z, L.w * s, L.h * s, c);
-    else if (L.shape === 'diamond') {
+    // every cell carries the gradient itself: blue at its top, running to mint at its bottom (about 80 : 20)
+    const air = (p.air ?? 0) * 0.7 * (1 - fog);
+    let top, bot;
+    if (L.shape === 'rect') { top = y + L.h * s / 2; bot = y - L.h * s / 2; }
+    else { top = y + L.r * s; bot = y - L.r * s; }
+    const span = Math.max(1e-6, top - bot);
+    const colAt = (yy, out) => airy(out.copy(gcol(g, clamp01((top - yy) / span) * p.colorShift)), air);
+    const edge = (ax, ay, bx, by, k) => { // split so the colour follows the gradient's stops along the edge
+      for (let q = 0; q < k; q++) {
+        const t0 = q / k, t1 = (q + 1) / k;
+        _a.set(ax + (bx - ax) * t0, ay + (by - ay) * t0, z); _b.set(ax + (bx - ax) * t1, ay + (by - ay) * t1, z);
+        dynSeg(g.dCells, b, _a, _b, colAt(_a.y, spC), colAt(_b.y, spC2));
+      }
+    };
+    if (L.shape === 'rect') {
+      const hw = L.w * s / 2;
+      edge(x - hw, top, x + hw, top, 1); edge(x + hw, top, x + hw, bot, 3); edge(x + hw, bot, x - hw, bot, 1); edge(x - hw, bot, x - hw, top, 3);
+    } else if (L.shape === 'diamond') {
       const r = L.r * s;
-      dynLine(g.dCells, b, x, y + r, z, x + r, y, z, c); dynLine(g.dCells, b, x + r, y, z, x, y - r, z, c);
-      dynLine(g.dCells, b, x, y - r, z, x - r, y, z, c); dynLine(g.dCells, b, x - r, y, z, x, y + r, z, c);
+      edge(x, y + r, x + r, y, 3); edge(x + r, y, x, y - r, 3); edge(x, y - r, x - r, y, 3); edge(x - r, y, x, y + r, 3);
     } else {
       const r = L.r * s, N = 32; // enough sides that the dot reads as a true circle
       for (let q = 0; q < N; q++) {
         const a0 = (q / N) * Math.PI * 2, a1 = ((q + 1) / N) * Math.PI * 2;
-        dynLine(g.dCells, b, x + r * Math.cos(a0), y + r * Math.sin(a0), z, x + r * Math.cos(a1), y + r * Math.sin(a1), z, c);
+        edge(x + r * Math.cos(a0), y + r * Math.sin(a0), x + r * Math.cos(a1), y + r * Math.sin(a1), 1);
       }
     }
   }
