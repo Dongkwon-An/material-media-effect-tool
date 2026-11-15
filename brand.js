@@ -64,7 +64,7 @@ const COMMON = {
 export const CATEGORIES = [
   {
     id: 'moving', motion: 'layers', gradient: 'violet-mint', flip: true, camera: 'low', fit: 1,
-    colors: ['#02FBCA', '#7E00FF', '#7E00FF'], stops: [0, 0.3, 1], // violet takes most of it (mint only at the front), so it never reads like software's blue-mint
+    colors: ['#02FBCA', '#02FBCA', '#7E00FF'], stops: [0, 0.55, 1], // mint leads and violet only tints the far end: apart from software (blue) and digital image (violet)
     name: { ko: '영상·사운드', en: 'Moving Image & Sound' },
     types: { ko: '필름 · 슬라이드 · 단채널 비디오 · 다채널 비디오 설치 · 사운드 아트', en: 'Film · Slide · Single-channel video · Multi-channel installation · Sound art' },
     basis: { ko: '영상 파일·필름 + 재생 장치', en: 'Video file or film + playback device' },
