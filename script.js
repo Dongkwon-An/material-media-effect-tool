@@ -2,8 +2,8 @@ import * as THREE from 'three';
 import { LineSegments2 } from 'three/addons/lines/LineSegments2.js';
 import { LineSegmentsGeometry } from 'three/addons/lines/LineSegmentsGeometry.js';
 import { LineMaterial } from 'three/addons/lines/LineMaterial.js';
-import * as BRAND from './brand.js?v=20261116b'; // ?v= makes the browser load fresh copies after an update
-import { I18N } from './i18n.js?v=20261116b';
+import * as BRAND from './brand.js?v=20261116c'; // ?v= makes the browser load fresh copies after an update
+import { I18N } from './i18n.js?v=20261116c';
 
 /* =========================================================
    State
@@ -1524,7 +1524,10 @@ function updateSubpix(g, T) {
       const r = L.r * s;
       edge(x, y + r, x + r, y, 3); edge(x + r, y, x, y - r, 3); edge(x, y - r, x - r, y, 3); edge(x - r, y, x, y + r, 3);
     } else {
-      const r = L.r * s, N = 32; // enough sides that the dot reads as a true circle
+      // as many sides as the circle needs at its size on screen, so it stays round however close the camera gets
+      const r = L.r * s, dist = Math.max(1e-3, Math.hypot(x - cp.x, y - cp.y, z - cp.z));
+      const pxR = r * (renderH * renderPR * 0.5) / (dist * Math.tan(THREE.MathUtils.degToRad(FOV / 2)));
+      const N = Math.max(16, Math.min(160, Math.ceil(pxR * 1.2 / 4) * 4));
       for (let q = 0; q < N; q++) {
         const a0 = (q / N) * Math.PI * 2, a1 = ((q + 1) / N) * Math.PI * 2;
         edge(x + r * Math.cos(a0), y + r * Math.sin(a0), x + r * Math.cos(a1), y + r * Math.sin(a1), 1);
