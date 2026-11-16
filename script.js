@@ -2,8 +2,8 @@ import * as THREE from 'three';
 import { LineSegments2 } from 'three/addons/lines/LineSegments2.js';
 import { LineSegmentsGeometry } from 'three/addons/lines/LineSegmentsGeometry.js';
 import { LineMaterial } from 'three/addons/lines/LineMaterial.js';
-import * as BRAND from './brand.js?v=20261115f'; // ?v= makes the browser load fresh copies after an update
-import { I18N } from './i18n.js?v=20261115f';
+import * as BRAND from './brand.js?v=20261116a'; // ?v= makes the browser load fresh copies after an update
+import { I18N } from './i18n.js?v=20261116a';
 
 /* =========================================================
    State
@@ -1885,8 +1885,8 @@ function lockExport(on) {
 }
 const QUALITY = {
   standard: { png: 1, mbps: [16, 40], offline: false },
-  high: { png: 2, mbps: [40, 100], offline: true },
-  max: { png: 4, mbps: [80, 160], offline: true },
+  high: { png: 2, mbps: [60, 140], offline: true },
+  max: { png: 4, mbps: [100, 200], offline: true },
 };
 function pngScale(W, H) { return Math.max(1, Math.min(QUALITY[state.exportQuality].png, Math.floor(8192 / Math.max(W, H)))); }
 function withExportSize(fn, scale = 1) {
@@ -1932,7 +1932,11 @@ async function exportVideoOffline() {
   try { ({ Muxer, ArrayBufferTarget } = await import('mp4-muxer')); } catch (e) { return false; }
   recording = true; offline = true; exporting = true; lockExport(true);
   const wasPlaying = playing;
-  setRenderSize(W, H, 1, false);
+  // draw every frame at twice the size and scale it down, as a sharp screen shows it: clean edges and fine echoes survive
+  const SS = big ? 1.5 : 2;
+  setRenderSize(W, H, SS, false);
+  const down = document.createElement('canvas'); down.width = W; down.height = H;
+  const dctx = down.getContext('2d', { alpha: false }); dctx.imageSmoothingEnabled = true; dctx.imageSmoothingQuality = 'high';
   const muxer = new Muxer({ target: new ArrayBufferTarget(), video: { codec: pick.mux, width: W, height: H, frameRate: fps }, fastStart: 'in-memory' });
   let failed = null;
   const enc = new VideoEncoder({ output: (chunk, meta) => muxer.addVideoChunk(chunk, meta), error: e => { failed = e; } });
@@ -1945,7 +1949,8 @@ async function exportVideoOffline() {
     for (let i = 0; i < total && !failed; i++) {
       clock = clock0 + i / fps;
       renderFrame(cam0 + i / fps);
-      const frame = new VideoFrame(renderer.domElement, { timestamp: Math.round(i * 1e6 / fps), duration: Math.round(1e6 / fps) });
+      dctx.drawImage(renderer.domElement, 0, 0, W, H);
+      const frame = new VideoFrame(down, { timestamp: Math.round(i * 1e6 / fps), duration: Math.round(1e6 / fps) });
       enc.encode(frame, { keyFrame: i % (fps * 2) === 0 });
       frame.close();
       if (i % 15 === 0) { if (btn) btn.textContent = `${t('exporting')} ${Math.round((i / total) * 100)}%`; await new Promise(r => setTimeout(r, 0)); }
