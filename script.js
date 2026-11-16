@@ -2,8 +2,8 @@ import * as THREE from 'three';
 import { LineSegments2 } from 'three/addons/lines/LineSegments2.js';
 import { LineSegmentsGeometry } from 'three/addons/lines/LineSegmentsGeometry.js';
 import { LineMaterial } from 'three/addons/lines/LineMaterial.js';
-import * as BRAND from './brand.js?v=20261116c'; // ?v= makes the browser load fresh copies after an update
-import { I18N } from './i18n.js?v=20261116c';
+import * as BRAND from './brand.js?v=20261116d'; // ?v= makes the browser load fresh copies after an update
+import { I18N } from './i18n.js?v=20261116d';
 
 /* =========================================================
    State
@@ -17,7 +17,7 @@ const state = {
   cats: Object.fromEntries(BRAND.CATEGORIES.map(c => [c.id, { ...c.defaults }])),
   bg: BRAND.BACKGROUND,
   camera: 'low', camDist: 1, returnFront: false, panX: 0, panY: 0,
-  exportSize: 'web', exportDuration: 10, exportQuality: 'high',
+  exportSize: 'web', exportDuration: 10, exportQuality: 'high', exportLoop: false,
   lang: 'ko',
 };
 { let l = null; try { l = localStorage.getItem('mm-lang'); } catch (e) { /* storage unavailable */ } state.lang = l || ((navigator.language || '').toLowerCase().startsWith('ko') ? 'ko' : 'en'); }
@@ -186,6 +186,7 @@ const GLOBAL_SECTIONS = [
   { key: 'export', desc: null, rows: [
     { k: 'exportSize', type: 'select', label: 'exportSize', opts: Object.keys(BRAND.EXPORT_SIZES).map(v => [v, v]) },
     { k: 'exportDuration', type: 'select', label: 'exportDuration', opts: [[5, '5s'], [10, '10s'], [15, '15s'], [30, '30s']], num: true, literalOpts: true },
+    { k: 'exportLoop', type: 'check', label: 'exportLoop' },
     { k: 'exportQuality', type: 'select', label: 'exportQuality', opts: [['standard', 'qStandard'], ['high', 'qHigh'], ['max', 'qMax']] },
     { type: 'button', id: 'exportPng', label: 'exportPng' },
     { type: 'button', id: 'exportMp4', label: 'exportMp4' },
@@ -332,7 +333,7 @@ function setGlobal(k, v) {
   state[k] = v;
   syncSidebar();
   if (k === 'camera') resetView();
-  if (CAMERA_KEYS.has(k) || k === 'exportDuration' || k === 'exportQuality') return;
+  if (CAMERA_KEYS.has(k) || k === 'exportDuration' || k === 'exportQuality' || k === 'exportLoop') return;
   if (k === 'exportSize') { resize(); rebuild(); }
 }
 function setBackground(hex) { state.bg = hex; canvas.style.background = hex; syncSidebar(); }
@@ -1884,7 +1885,7 @@ function fileName(ext) {
   const names = CAT_ORDER.filter(id => state.on.has(id)).join('-') || 'empty';
   const d = new Date(), z = n => String(n).padStart(2, '0');
   const stamp = `${d.getFullYear()}${z(d.getMonth() + 1)}${z(d.getDate())}-${z(d.getHours())}${z(d.getMinutes())}${z(d.getSeconds())}`;
-  return `material-media_${names}_${stamp}.${ext}`;
+  return `material-media_${names}${ext === 'mp4' && state.exportLoop ? '_loop' : ''}_${stamp}.${ext}`;
 }
 function download(href, name) { const a = document.createElement('a'); a.href = href; a.download = name; document.body.appendChild(a); a.click(); a.remove(); }
 function lockExport(on) {
@@ -1920,7 +1921,7 @@ function exportPNG() {
 
 async function exportVideo() {
   if (recording || guardEmpty()) return;
-  if (QUALITY[state.exportQuality].offline && window.VideoEncoder) {
+  if ((QUALITY[state.exportQuality].offline || state.exportLoop) && window.VideoEncoder) { // a loop needs every frame drawn on its own
     const ok = await exportVideoOffline();
     if (ok) return;
   }
@@ -1955,10 +1956,22 @@ async function exportVideoOffline() {
     // record from the moment on screen, so the motion is there from the first frame (clock 0 can sit before
     // the category's own start and draw nothing for a few seconds)
     const clock0 = clock, cam0 = camTime;
+    // loop: over the first moments the picture fades in from where the clip ends, so the last frame
+    // runs straight into the first and the video can repeat without a visible cut
+    const Ld = total / fps, F = state.exportLoop ? Math.min(1.5, Ld * 0.25) : 0;
     for (let i = 0; i < total && !failed; i++) {
-      clock = clock0 + i / fps;
-      renderFrame(cam0 + i / fps);
-      dctx.drawImage(renderer.domElement, 0, 0, W, H);
+      const tt = i / fps;
+      if (tt < F) {
+        clock = clock0 + tt + Ld; renderFrame(cam0 + tt + Ld);
+        dctx.globalAlpha = 1; dctx.drawImage(renderer.domElement, 0, 0, W, H);
+        clock = clock0 + tt; renderFrame(cam0 + tt);
+        dctx.globalAlpha = THREE.MathUtils.smootherstep(tt, 0, F); dctx.drawImage(renderer.domElement, 0, 0, W, H);
+        dctx.globalAlpha = 1;
+      } else {
+        clock = clock0 + tt;
+        renderFrame(cam0 + tt);
+        dctx.drawImage(renderer.domElement, 0, 0, W, H);
+      }
       const frame = new VideoFrame(down, { timestamp: Math.round(i * 1e6 / fps), duration: Math.round(1e6 / fps) });
       enc.encode(frame, { keyFrame: i % (fps * 2) === 0 });
       frame.close();
