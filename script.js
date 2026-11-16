@@ -2,8 +2,8 @@ import * as THREE from 'three';
 import { LineSegments2 } from 'three/addons/lines/LineSegments2.js';
 import { LineSegmentsGeometry } from 'three/addons/lines/LineSegmentsGeometry.js';
 import { LineMaterial } from 'three/addons/lines/LineMaterial.js';
-import * as BRAND from './brand.js?v=20261116a'; // ?v= makes the browser load fresh copies after an update
-import { I18N } from './i18n.js?v=20261116a';
+import * as BRAND from './brand.js?v=20261116b'; // ?v= makes the browser load fresh copies after an update
+import { I18N } from './i18n.js?v=20261116b';
 
 /* =========================================================
    State
@@ -359,7 +359,7 @@ document.querySelectorAll('[data-lang]').forEach(b => b.addEventListener('click'
 const canvas = document.getElementById('canvas');
 const stageEl = document.getElementById('stage');
 const emptyEl = document.getElementById('empty');
-const renderer = new THREE.WebGLRenderer({ canvas, antialias: true, preserveDrawingBuffer: true });
+const renderer = new THREE.WebGLRenderer({ canvas, antialias: true, preserveDrawingBuffer: true, stencil: true });
 const scene = new THREE.Scene();
 const FOV = 35;
 const camera = new THREE.PerspectiveCamera(FOV, 16 / 9, 0.05, 400);
@@ -414,8 +414,14 @@ const sharedGeometry = new LineSegmentsGeometry().setPositions(UNIT_EDGES);
 const quatFromDeg = (x, y, z) => new THREE.Quaternion().setFromEuler(new THREE.Euler(...[x, y, z].map(THREE.MathUtils.degToRad), 'YXZ'));
 const CAT_ORDER = BRAND.CATEGORIES.map(c => c.id);
 
+let stencilRef = 0;
 function makeLineMaterial(px) {
   const m = new LineMaterial({ color: 0xffffff, linewidth: px * lineScale, transparent: true, opacity: 0, depthWrite: false });
+  // each pixel is painted once per line mesh: where segments of one line meet (or a line crosses itself) the
+  // see-through colour does not stack up, so curves and circles stay one even stroke instead of a dotted one
+  stencilRef = stencilRef % 255 + 1;
+  m.stencilWrite = true; m.stencilRef = stencilRef; m.stencilFuncMask = 0xff; m.stencilWriteMask = 0xff;
+  m.stencilFunc = THREE.NotEqualStencilFunc; m.stencilZPass = THREE.ReplaceStencilOp; m.stencilFail = THREE.KeepStencilOp; m.stencilZFail = THREE.KeepStencilOp;
   m.userData.px = px;
   m.resolution.set(renderW * renderPR, renderH * renderPR);
   return m;
