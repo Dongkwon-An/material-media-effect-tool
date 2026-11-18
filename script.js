@@ -2,8 +2,8 @@ import * as THREE from 'three';
 import { LineSegments2 } from 'three/addons/lines/LineSegments2.js';
 import { LineSegmentsGeometry } from 'three/addons/lines/LineSegmentsGeometry.js';
 import { LineMaterial } from 'three/addons/lines/LineMaterial.js';
-import * as BRAND from './brand.js?v=20261118b'; // ?v= makes the browser load fresh copies after an update
-import { I18N } from './i18n.js?v=20261118b';
+import * as BRAND from './brand.js?v=20261118c'; // ?v= makes the browser load fresh copies after an update
+import { I18N } from './i18n.js?v=20261118c';
 
 /* =========================================================
    State
@@ -1264,16 +1264,17 @@ function walkState(u, time, out) {
      beats (BPM) and 8-count phrases, with an accent on each beat.
    --------------------------------------------------------- */
 // The score: three set paths, always the same, danced one after another and then again from the start.
-// Every path is made only of round turns (no corners): a wide orbit, an orbit that loops in small circles,
-// and a figure 8 with round lobes. Each path takes 16 counts.
-const DANCE_PATHS = ['orbit', 'loops', 'eight'], PATH_BEATS = 16;
+// Every path is one big round turn (an ellipse) with no S-bends and no corners: a wide flat orbit,
+// an upright loop, and a slanted loop. Each path takes 16 counts.
+const DANCE_PATHS = ['orbit', 'upright', 'slant'], PATH_BEATS = 16;
 const FIG1 = [0, 0, 0], FIG2 = [0, 0, 0];
 const setF = (o, x, y, z) => { o[0] = x; o[1] = y; o[2] = z; return o; };
 function pathAt(name, a, R, o) {
-  // a: angle around the path (0 … 2π for one round); smooth periodic curves, so the line always turns in circles
-  if (name === 'orbit') return setF(o, R * 1.35 * Math.cos(a), R * 0.35 * Math.sin(a + 1.0), R * 0.9 * Math.sin(a));
-  if (name === 'loops') return setF(o, R * (1.0 * Math.cos(a) + 0.3 * Math.cos(5 * a)), R * 0.3 * Math.sin(2 * a), R * (0.75 * Math.sin(a) + 0.3 * Math.sin(5 * a))); // five small round loops on a big circle
-  return setF(o, R * 1.35 * Math.sin(a), R * 0.35 * Math.cos(a), R * 0.8 * Math.sin(a) * Math.cos(a)); // figure 8 with round ends
+  // a: angle around the path (0 … 2π for one round); always the same turning direction, so the line only ever curves one way
+  const c = Math.cos(a), s = Math.sin(a);
+  if (name === 'orbit') return setF(o, R * 1.35 * c, R * 0.25 * s, R * 0.9 * s);          // wide and nearly flat, like walking a circle on the stage
+  if (name === 'upright') return setF(o, R * 1.1 * c, R * 0.8 * s, R * 0.45 * s);          // standing up, like an arm sweeping a big circle
+  return setF(o, R * 1.2 * c, R * 0.55 * (0.7 * s + 0.7 * c), R * 0.7 * s);                // tilted between the two
 }
 const dvA = new THREE.Vector3(), dvB = new THREE.Vector3(), dvC = new THREE.Vector3(), dvD = new THREE.Vector3();
 function danceHead(g, d, T, out) {
@@ -1325,7 +1326,7 @@ function updateDance(g, T) {
     for (let k = 0; k <= L; k++) {
       // the ribbon's width follows the turning of the body over time (the roll), not the bends of
       // the path, so it never flips when the path loops back on itself
-      const SS = THREE.MathUtils.smootherstep, age = k / L, taper = (0.6 + 0.4 * SS(1 - age, 0, 0.6)) * (0.75 + 0.25 * SS(age, 0, 0.2)), r = roll[k]; // the lines stay apart: only a gentle narrowing toward the tail, never gathered into a point
+      const SS = THREE.MathUtils.smootherstep, age = k / L, taper = 0.6 + 0.4 * SS(1 - age, 0, 0.6), r = roll[k]; // the lines stay apart: only a gentle narrowing toward the tail, never gathered into a point
       rbW[k].copy(rbY).multiplyScalar(Math.cos(r)).addScaledVector(rbB.set(0.8, 0, 0.6), Math.sin(r)).multiplyScalar(half * taper);
     }
     for (let k = L - 1; k >= 0; k--) { // tail first, so the bright head is drawn on top
