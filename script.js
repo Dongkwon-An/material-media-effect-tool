@@ -2,8 +2,8 @@ import * as THREE from 'three';
 import { LineSegments2 } from 'three/addons/lines/LineSegments2.js';
 import { LineSegmentsGeometry } from 'three/addons/lines/LineSegmentsGeometry.js';
 import { LineMaterial } from 'three/addons/lines/LineMaterial.js';
-import * as BRAND from './brand.js?v=20261118c'; // ?v= makes the browser load fresh copies after an update
-import { I18N } from './i18n.js?v=20261118c';
+import * as BRAND from './brand.js?v=20261118d'; // ?v= makes the browser load fresh copies after an update
+import { I18N } from './i18n.js?v=20261118d';
 
 /* =========================================================
    State
@@ -1263,18 +1263,22 @@ function walkState(u, time, out) {
    Why this rhythm: a performance follows a score; here the score counts in
      beats (BPM) and 8-count phrases, with an accent on each beat.
    --------------------------------------------------------- */
-// The score: three set paths, always the same, danced one after another and then again from the start.
-// Every path is one big round turn (an ellipse) with no S-bends and no corners: a wide flat orbit,
-// an upright loop, and a slanted loop. Each path takes 16 counts.
-const DANCE_PATHS = ['orbit', 'upright', 'slant'], PATH_BEATS = 16;
+// The score: four set paths, always the same, danced one after another and then again from the start.
+// Every path turns only one way, with no S-bends and no corners: a wide flat orbit, an upright loop,
+// a slanted loop, and a coil (two smaller circles that rise and sink, like a spin). Each path takes 16 counts.
+const DANCE_PATHS = ['orbit', 'upright', 'slant', 'coil'], PATH_BEATS = 16;
 const FIG1 = [0, 0, 0], FIG2 = [0, 0, 0];
 const setF = (o, x, y, z) => { o[0] = x; o[1] = y; o[2] = z; return o; };
 function pathAt(name, a, R, o) {
-  // a: angle around the path (0 … 2π for one round); always the same turning direction, so the line only ever curves one way
+  // a: angle around the path (0 … 2π for one round); always the same turning direction, so the line only ever curves one way.
+  // Every path starts and ends at the same point (right side of the stage, at mid height) heading the same way,
+  // so passing from one path into the next is one smooth continuous turn
   const c = Math.cos(a), s = Math.sin(a);
-  if (name === 'orbit') return setF(o, R * 1.35 * c, R * 0.25 * s, R * 0.9 * s);          // wide and nearly flat, like walking a circle on the stage
-  if (name === 'upright') return setF(o, R * 1.1 * c, R * 0.8 * s, R * 0.45 * s);          // standing up, like an arm sweeping a big circle
-  return setF(o, R * 1.2 * c, R * 0.55 * (0.7 * s + 0.7 * c), R * 0.7 * s);                // tilted between the two
+  if (name === 'orbit') return setF(o, R * 1.2 * c, R * 0.25 * s, R * 0.9 * s);           // wide and nearly flat, like walking a circle on the stage
+  if (name === 'upright') return setF(o, R * 1.2 * c, R * 0.8 * s, R * 0.5 * s);           // standing up, like an arm sweeping a big circle
+  if (name === 'slant') return setF(o, R * 1.2 * c, R * 0.5 * s, R * 0.75 * s);            // tilted between the two
+  // coil: two smaller turns in one round (seen from above, always the same way round) that rise and sink like a spin
+  return setF(o, R * (0.4 + 0.8 * Math.cos(2 * a)), R * 0.55 * s, R * 0.7 * Math.sin(2 * a));
 }
 const dvA = new THREE.Vector3(), dvB = new THREE.Vector3(), dvC = new THREE.Vector3(), dvD = new THREE.Vector3();
 function danceHead(g, d, T, out) {
@@ -1283,9 +1287,9 @@ function danceHead(g, d, T, out) {
   const b = Math.floor(B), f = B - b, acc = Math.min(0.9, p.accent);
   const tau = b + f + (acc / (2 * Math.PI)) * Math.sin(2 * Math.PI * f); // accent 0 = an even, flowing pace
   const k = Math.floor(tau / PATH_BEATS), u = (tau - PATH_BEATS * k) / PATH_BEATS, a = Math.PI * 2 * u;
-  const cur = DANCE_PATHS[((k % 3) + 3) % 3], nxt = DANCE_PATHS[(((k + 1) % 3) + 3) % 3];
+  const NP = DANCE_PATHS.length, cur = DANCE_PATHS[((k % NP) + NP) % NP], nxt = DANCE_PATHS[(((k + 1) % NP) + NP) % NP];
   const f1 = pathAt(cur, a, S.R, FIG1), f2 = pathAt(nxt, a, S.R, FIG2);
-  const w = THREE.MathUtils.smootherstep(u, 0.7, 1); // the last part of each round eases into the next path, with no kink
+  const w = THREE.MathUtils.smootherstep(u, 0.55, 1); // the last part of each round eases slowly into the next path, with no kink
   out.set(f1[0] * (1 - w) + f2[0] * w, f1[1] * (1 - w) + f2[1] * w, f1[2] * (1 - w) + f2[2] * w);
   out.x *= d.mirror;
   out.add(d.offset).add(S.o);
