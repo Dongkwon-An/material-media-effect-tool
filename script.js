@@ -2,8 +2,8 @@ import * as THREE from 'three';
 import { LineSegments2 } from 'three/addons/lines/LineSegments2.js';
 import { LineSegmentsGeometry } from 'three/addons/lines/LineSegmentsGeometry.js';
 import { LineMaterial } from 'three/addons/lines/LineMaterial.js';
-import * as BRAND from './brand.js?v=20261118a'; // ?v= makes the browser load fresh copies after an update
-import { I18N } from './i18n.js?v=20261118a';
+import * as BRAND from './brand.js?v=20261118b'; // ?v= makes the browser load fresh copies after an update
+import { I18N } from './i18n.js?v=20261118b';
 
 /* =========================================================
    State
@@ -1325,7 +1325,7 @@ function updateDance(g, T) {
     for (let k = 0; k <= L; k++) {
       // the ribbon's width follows the turning of the body over time (the roll), not the bends of
       // the path, so it never flips when the path loops back on itself
-      const SS = THREE.MathUtils.smootherstep, age = k / L, taper = SS(1 - age, 0, 0.22) * (0.35 + 0.65 * SS(age, 0, 0.12)), r = roll[k]; // a smooth taper: no kinks in the edges
+      const SS = THREE.MathUtils.smootherstep, age = k / L, taper = (0.6 + 0.4 * SS(1 - age, 0, 0.6)) * (0.75 + 0.25 * SS(age, 0, 0.2)), r = roll[k]; // the lines stay apart: only a gentle narrowing toward the tail, never gathered into a point
       rbW[k].copy(rbY).multiplyScalar(Math.cos(r)).addScaledVector(rbB.set(0.8, 0, 0.6), Math.sin(r)).multiplyScalar(half * taper);
     }
     for (let k = L - 1; k >= 0; k--) { // tail first, so the bright head is drawn on top
