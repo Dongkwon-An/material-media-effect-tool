@@ -2,8 +2,8 @@ import * as THREE from 'three';
 import { LineSegments2 } from 'three/addons/lines/LineSegments2.js';
 import { LineSegmentsGeometry } from 'three/addons/lines/LineSegmentsGeometry.js';
 import { LineMaterial } from 'three/addons/lines/LineMaterial.js';
-import * as BRAND from './brand.js?v=20261118d'; // ?v= makes the browser load fresh copies after an update
-import { I18N } from './i18n.js?v=20261118d';
+import * as BRAND from './brand.js?v=20261118e'; // ?v= makes the browser load fresh copies after an update
+import { I18N } from './i18n.js?v=20261118e';
 
 /* =========================================================
    State
@@ -1291,6 +1291,12 @@ function danceHead(g, d, T, out) {
   const f1 = pathAt(cur, a, S.R, FIG1), f2 = pathAt(nxt, a, S.R, FIG2);
   const w = THREE.MathUtils.smootherstep(u, 0.55, 1); // the last part of each round eases slowly into the next path, with no kink
   out.set(f1[0] * (1 - w) + f2[0] * w, f1[1] * (1 - w) + f2[1] * w, f1[2] * (1 - w) + f2[2] * w);
+  // freer, but still only round turns: the circle breathes wider and narrower as it goes (gently enough that it
+  // never bends back the other way), and the whole path drifts slowly around the stage over the full score
+  const ph = Math.PI * 2 * tau / (PATH_BEATS * NP), Rr = S.R;
+  const breathe = 1 + 0.14 * Math.sin(2 * a + 3 * ph); // continuous across the change of path (no jump, no step)
+  out.x *= breathe; out.z *= breathe;
+  out.x += Rr * 0.35 * Math.cos(ph); out.y += Rr * 0.15 * Math.sin(2 * ph); out.z += Rr * 0.3 * Math.sin(ph);
   out.x *= d.mirror;
   out.add(d.offset).add(S.o);
   // the body turns a quarter turn on every beat (× twist), so the line form rolls with it
