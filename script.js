@@ -2,8 +2,8 @@ import * as THREE from 'three';
 import { LineSegments2 } from 'three/addons/lines/LineSegments2.js';
 import { LineSegmentsGeometry } from 'three/addons/lines/LineSegmentsGeometry.js';
 import { LineMaterial } from 'three/addons/lines/LineMaterial.js';
-import * as BRAND from './brand.js?v=20261116e'; // ?v= makes the browser load fresh copies after an update
-import { I18N } from './i18n.js?v=20261116e';
+import * as BRAND from './brand.js?v=20261118a'; // ?v= makes the browser load fresh copies after an update
+import { I18N } from './i18n.js?v=20261118a';
 
 /* =========================================================
    State
@@ -1263,56 +1263,44 @@ function walkState(u, time, out) {
    Why this rhythm: a performance follows a score; here the score counts in
      beats (BPM) and 8-count phrases, with an accent on each beat.
    --------------------------------------------------------- */
-const FIGURES = ['circle', 'spiral', 'snake', 'eight'];
-// The score: four places on the stage, visited in a fixed clockwise order, one 8-count each,
-// and at each place always the same figure. 32 counts make one round, then it repeats.
-//   front → circle   right → spiral   back → wave   left → figure 8
-const SCORE = [{ area: 0, figure: 'circle' }, { area: 1, figure: 'spiral' }, { area: 2, figure: 'snake' }, { area: 3, figure: 'eight' }];
-const SCORE_TURN = SCORE.map(x => ({ area: x.area, figure: x.figure, turn: 1 }));
-function danceSeq(d, k) { return SCORE_TURN[((k % 4) + 4) % 4]; }
+// The score: three set paths, always the same, danced one after another and then again from the start.
+// Every path is made only of round turns (no corners): a wide orbit, an orbit that loops in small circles,
+// and a figure 8 with round lobes. Each path takes 16 counts.
+const DANCE_PATHS = ['orbit', 'loops', 'eight'], PATH_BEATS = 16;
 const FIG1 = [0, 0, 0], FIG2 = [0, 0, 0];
 const setF = (o, x, y, z) => { o[0] = x; o[1] = y; o[2] = z; return o; };
-function figureAt(fig, tau, u, R, turn, o) {
-  // the four basic figures; slow, long loops so the ribbon flows instead of jerking
-  const TAU = Math.PI * 2;
-  if (fig === 'circle') { const a = TAU * tau / 8 * turn; return setF(o, R * Math.cos(a), R * 0.8 * Math.sin(a), R * 0.3 * Math.sin(a * 0.5)); } // one wide loop per 8 counts
-  if (fig === 'spiral') { const a = TAU * tau / 6 * turn, rr = R * (0.55 + 0.45 * Math.sin(Math.PI * u)); return setF(o, rr * Math.cos(a), R * 0.7 * Math.sin(TAU * tau / 16), rr * Math.sin(a)); } // flat loops that swell and settle
-  if (fig === 'snake') return setF(o, R * 0.35 * Math.sin(TAU * tau / 16), R * 0.6 * Math.sin(TAU * tau / 4), R * 0.7 * Math.sin(TAU * tau / 8) * turn); // a slow wave
-  const a = TAU * tau / 8 * turn; return setF(o, R * 1.1 * Math.sin(a), R * 0.7 * Math.sin(a) * Math.cos(a), R * 0.4 * Math.cos(a));  // figure 8 over 8 counts
+function pathAt(name, a, R, o) {
+  // a: angle around the path (0 … 2π for one round); smooth periodic curves, so the line always turns in circles
+  if (name === 'orbit') return setF(o, R * 1.35 * Math.cos(a), R * 0.35 * Math.sin(a + 1.0), R * 0.9 * Math.sin(a));
+  if (name === 'loops') return setF(o, R * (1.0 * Math.cos(a) + 0.3 * Math.cos(5 * a)), R * 0.3 * Math.sin(2 * a), R * (0.75 * Math.sin(a) + 0.3 * Math.sin(5 * a))); // five small round loops on a big circle
+  return setF(o, R * 1.35 * Math.sin(a), R * 0.35 * Math.cos(a), R * 0.8 * Math.sin(a) * Math.cos(a)); // figure 8 with round ends
 }
 const dvA = new THREE.Vector3(), dvB = new THREE.Vector3(), dvC = new THREE.Vector3(), dvD = new THREE.Vector3();
 function danceHead(g, d, T, out) {
-  // position of the performer's hand (the ribbon's head) at time T, and the twist angle
+  // position of the performer's hand (the line's head) at time T, and the twist angle
   const p = g.p, S = g.stage, beat = 60 / p.bpm, B = T / beat + d.delay;
   const b = Math.floor(B), f = B - b, acc = Math.min(0.9, p.accent);
   const tau = b + f + (acc / (2 * Math.PI)) * Math.sin(2 * Math.PI * f); // accent 0 = an even, flowing pace
-  const k = Math.floor(tau / 8), u = (tau - 8 * k) / 8;
-  const A = i => S.areas[danceSeq(d, i).area];
-  // travel between areas with a continuous Catmull-Rom path, one area per 8 counts
-  const P0 = A(k - 1), P1 = A(k), P2 = A(k + 1), P3 = A(k + 2), e = u;
-  const cr = (a, b2, c, dd) => 0.5 * (2 * b2 + (-a + c) * e + (2 * a - 5 * b2 + 4 * c - dd) * e * e + (-a + 3 * b2 - 3 * c + dd) * e * e * e);
-  out.set(cr(P0.x, P1.x, P2.x, P3.x), cr(P0.y, P1.y, P2.y, P3.y), cr(P0.z, P1.z, P2.z, P3.z));
-  const R = S.R, cur = danceSeq(d, k), nxt = danceSeq(d, k + 1);
-  const f1 = figureAt(cur.figure, tau, u, R, cur.turn, FIG1), f2 = figureAt(nxt.figure, tau, 0, R, nxt.turn, FIG2);
-  const w = THREE.MathUtils.smootherstep(u, 0.4, 1); // the second half of each phrase eases into the next figure
-  out.x += f1[0] * (1 - w) + f2[0] * w; out.y += f1[1] * (1 - w) + f2[1] * w; out.z += f1[2] * (1 - w) + f2[2] * w;
+  const k = Math.floor(tau / PATH_BEATS), u = (tau - PATH_BEATS * k) / PATH_BEATS, a = Math.PI * 2 * u;
+  const cur = DANCE_PATHS[((k % 3) + 3) % 3], nxt = DANCE_PATHS[(((k + 1) % 3) + 3) % 3];
+  const f1 = pathAt(cur, a, S.R, FIG1), f2 = pathAt(nxt, a, S.R, FIG2);
+  const w = THREE.MathUtils.smootherstep(u, 0.7, 1); // the last part of each round eases into the next path, with no kink
+  out.set(f1[0] * (1 - w) + f2[0] * w, f1[1] * (1 - w) + f2[1] * w, f1[2] * (1 - w) + f2[2] * w);
   out.x *= d.mirror;
   out.add(d.offset).add(S.o);
-  // the body turns a quarter turn on every beat (× twist), so the ribbon rolls with it
+  // the body turns a quarter turn on every beat (× twist), so the line form rolls with it
   return Math.PI * p.twist * tau * 0.25; // one steady direction, so the twist never jumps
 }
 function buildDance(g, base, W0) {
   const p = g.p, n = p.count, sp = p.spread;
-  // four places around the centre of the stage: front, right, back, left
-  const areas = [new THREE.Vector3(0, -W0 * 0.08 * sp, W0 * 0.45 * sp), new THREE.Vector3(W0 * 0.48 * sp, 0, 0), new THREE.Vector3(0, W0 * 0.08 * sp, -W0 * 0.45 * sp), new THREE.Vector3(-W0 * 0.48 * sp, 0, 0)];
-  g.stage = { o: base.clone(), areas, R: W0 * 0.3 * p.amplitude };
+  g.stage = { o: base.clone(), R: W0 * 0.34 * p.amplitude * sp }; // the paths are centred on the stage
   g.dancers = [];
   for (let i = 0; i < n; i++) {
     const mode = p.behaviour;
-    // canon: each performer starts one place (8 counts) later, so four performers fill all four places at once
+    // canon: each performer starts later on the same paths, so they follow one another around them
     // unison: everyone dances the same score side by side
     // mirror: every second performer dances the score left-right reversed
-    const delay = mode === 'canon' ? -i * 8 : 0;
+    const delay = mode === 'canon' ? -i * 4 : 0;
     const offset = mode === 'unison' ? new THREE.Vector3((i - (n - 1) / 2) * W0 * 0.25, 0, 0) : mode === 'mirror' ? new THREE.Vector3(0, 0, (Math.floor(i / 2)) * -W0 * 0.2) : new THREE.Vector3();
     g.dancers.push({ delay, offset, mirror: mode === 'mirror' && i % 2 === 1 ? -1 : 1, hue: n > 1 ? i / (n - 1) : 0 });
   }
@@ -1337,7 +1325,7 @@ function updateDance(g, T) {
     for (let k = 0; k <= L; k++) {
       // the ribbon's width follows the turning of the body over time (the roll), not the bends of
       // the path, so it never flips when the path loops back on itself
-      const age = k / L, taper = Math.min(1, (1 - age) * 5) * Math.min(1, 0.35 + age * 6), r = roll[k];
+      const SS = THREE.MathUtils.smootherstep, age = k / L, taper = SS(1 - age, 0, 0.22) * (0.35 + 0.65 * SS(age, 0, 0.12)), r = roll[k]; // a smooth taper: no kinks in the edges
       rbW[k].copy(rbY).multiplyScalar(Math.cos(r)).addScaledVector(rbB.set(0.8, 0, 0.6), Math.sin(r)).multiplyScalar(half * taper);
     }
     for (let k = L - 1; k >= 0; k--) { // tail first, so the bright head is drawn on top
