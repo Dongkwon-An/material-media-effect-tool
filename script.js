@@ -2,8 +2,8 @@ import * as THREE from 'three';
 import { LineSegments2 } from 'three/addons/lines/LineSegments2.js';
 import { LineSegmentsGeometry } from 'three/addons/lines/LineSegmentsGeometry.js';
 import { LineMaterial } from 'three/addons/lines/LineMaterial.js';
-import * as BRAND from './brand.js?v=20261119a'; // ?v= makes the browser load fresh copies after an update
-import { I18N } from './i18n.js?v=20261119a';
+import * as BRAND from './brand.js?v=20261119b'; // ?v= makes the browser load fresh copies after an update
+import { I18N } from './i18n.js?v=20261119b';
 
 /* =========================================================
    State
@@ -840,18 +840,21 @@ function turnPose(g, TL, T, j, o) {
   const D = Math.min(sw, sh) * U * (p.stackGap ?? 1), step = TL.N > 1 ? D / (TL.N - 1) : 0;
   const grow = t >= TL.buildStart ? lin(t, TL.buildStart, TL.buildEnd) * (t < TL.flatStart ? 1 : 1 - lin(t, TL.flatStart, TL.flatEnd)) : 0;
   tuV.set(0, 0, step * j * e - D / 2 * grow).applyQuaternion(tuQ);                   // the box stays centred as it grows
-  o.pos.copy(g.tu.o).add(tuV); o.w = sw * U; o.h = sh * U;
+  o.pos.copy(g.tu.o).add(tuV); o.w = sw * U; o.h = sh * U; o.e = j > 0 ? e : 1;
   return true;
 }
 const tuA = { pos: new THREE.Vector3(), q: new THREE.Quaternion(), w: 0, h: 0 }, tuP = { pos: new THREE.Vector3(), q: new THREE.Quaternion(), w: -1, h: 0 };
 function updateTurn(g, T) {
   const p = g.p, TL = turnTimeline(g), N = TL.N, dB = g.dTurn, dT = g.dTurnThin, every = Math.round(p.boldEvery || 0);
-  const Lh = Math.min(40, Math.round(p.echoLength)), dt = 0.25 / p.echoDensity, E = BRAND.ECHO;
+  const Lh = Math.min(60, Math.round(p.echoLength)), dt = 0.25 / p.echoDensity, E = BRAND.ECHO;
   dynBegin(dB); dynBegin(dT);
   for (let j = 0; j < N; j++) {
     const base = (N > 1 ? j / (N - 1) : 0) * p.colorShift;
     // only some layers are drawn bold (the first, the last and every few in between); the rest are thin, faint lines
-    const bold = !every || j === 0 || j === N - 1 || j % every === 0, d = bold ? dB : dT, wA = bold ? 1 : (p.thinAlpha ?? 0.35);
+    const bold = !every || j === 0 || j === N - 1 || j % every === 0, d = bold ? dB : dT;
+    // thin layers are faintest halfway between two bold ones, so the side shades softly from line to line like a gradient
+    const near = every ? Math.min(j % every, every - (j % every)) / (every / 2) : 0;
+    const wA = bold ? 1 : (p.thinAlpha ?? 0.35) * (1 - 0.75 * near * near);
     tuP.w = -1;
     for (let k = Lh; k >= 1; k--) { // stepped echoes, oldest first, only where the layer was moving
       const te = T - k * dt, tc = Math.max(0, te) % TL.len;
@@ -862,9 +865,12 @@ function updateTurn(g, T) {
       if (moved < 0.004) continue;
       const age = k / Lh, b = fogB(Math.min(1, 0.55 * wA * Math.pow(1 - age, E.falloff) * p.echoOpacity));
       if (b < 0) continue;
-      layerRect(d, b, tuA, airy(lyC.copy(gcol(g, base + (1 - base) * age * p.colorShift)), (p.air ?? 0) * 0.85 * Math.pow(age, 0.7)));
+      const ea = THREE.MathUtils.smootherstep(tuA.e, 0, 1), b2 = fogB(Math.min(1, 0.55 * wA * ea * Math.pow(1 - age, E.falloff) * p.echoOpacity));
+      if (b2 < 0) continue;
+      layerRect(d, b2, tuA, airy(lyC.copy(gcol(g, base + (1 - base) * age * p.colorShift)), (p.air ?? 0) * 0.85 * Math.pow(age, 0.7)));
     }
-    if (turnPose(g, TL, T, j, tuA)) layerRect(d, fogB(0.95 * wA), tuA, lyC.copy(gcol(g, base)));
+    // a layer fades in as it rises and fades out as it settles back down, so lines come and go softly, like a gradient
+    if (turnPose(g, TL, T, j, tuA)) { const bh = fogB(0.95 * wA * THREE.MathUtils.smootherstep(tuA.e, 0, 1)); if (bh >= 0) layerRect(d, bh, tuA, lyC.copy(gcol(g, base))); }
   }
   dynEnd(dB); dynEnd(dT);
 }
