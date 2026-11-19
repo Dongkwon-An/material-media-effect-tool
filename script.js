@@ -2,8 +2,8 @@ import * as THREE from 'three';
 import { LineSegments2 } from 'three/addons/lines/LineSegments2.js';
 import { LineSegmentsGeometry } from 'three/addons/lines/LineSegmentsGeometry.js';
 import { LineMaterial } from 'three/addons/lines/LineMaterial.js';
-import * as BRAND from './brand.js?v=20261118f'; // ?v= makes the browser load fresh copies after an update
-import { I18N } from './i18n.js?v=20261118f';
+import * as BRAND from './brand.js?v=20261119a'; // ?v= makes the browser load fresh copies after an update
+import { I18N } from './i18n.js?v=20261119a';
 
 /* =========================================================
    State
@@ -101,7 +101,9 @@ const R = {
   // digital image: layers
   layerCount: { k: 'layers', c: true, type: 'range', label: 'layerCount', min: 2, max: 10, step: 1 },
   stackTwist: { k: 'stackTwist', c: true, type: 'range', label: 'stackTwist', min: 0, max: 20, step: 0.5, unit: '°' },
-  turnLayers: { k: 'layers', c: true, type: 'range', label: 'layerCount', min: 2, max: 12, step: 1 },
+  turnLayers: { k: 'layers', c: true, type: 'range', label: 'layerCount', min: 2, max: 30, step: 1 },
+  boldEvery: { k: 'boldEvery', c: true, type: 'range', label: 'boldEvery', min: 1, max: 10, step: 1 },
+  thinAlpha: { k: 'thinAlpha', c: true, type: 'range', label: 'thinAlpha', min: 0.05, max: 1, step: 0.05 },
   boxDepth: { k: 'stackGap', c: true, type: 'range', label: 'boxDepth', min: 0.3, max: 2, step: 0.05, unit: '×' },
   stackGap: { k: 'stackGap', c: true, type: 'range', label: 'stackGap', min: 0.3, max: 2.5, step: 0.05, unit: '×' },
   // screens
@@ -165,7 +167,7 @@ const MOTION_GROUPS = {
     { key: 'echoes', desc: 'descEchoes', rows: [R.echoLength, R.echoDensity, R.echoOpacity, R.colorShift, R.air] },
   ],
   turn: [
-    { key: 'motion', desc: 'descTurn', rows: [R.turnLayers, R.boxDepth, R.plateSize] },
+    { key: 'motion', desc: 'descTurn', rows: [R.turnLayers, R.boldEvery, R.thinAlpha, R.boxDepth, R.plateSize] },
     { key: 'echoes', desc: 'descEchoes', rows: [R.echoLength, R.echoDensity, R.echoOpacity, R.colorShift, R.air] },
   ],
   format: [
@@ -194,7 +196,7 @@ const GLOBAL_SECTIONS = [
   ] },
 ];
 const CAMERA_KEYS = new Set(['camera', 'camDist', 'returnFront', 'panX', 'panY']);
-const LIVE_CAT_KEYS = new Set(['echoDensity', 'echoOpacity', 'colorShift', 'distanceFade', 'echoLength', 'reverse', 'lineColor', 'history', 'layerDepth', 'air', 'glow', 'hold', 'transition', 'bpm', 'accent', 'twist', 'ribbon', 'ribbonWidth', 'cropMarks', 'tick', 'gap', 'turnRate', 'layers', 'stackGap', 'stackTwist']);
+const LIVE_CAT_KEYS = new Set(['echoDensity', 'echoOpacity', 'colorShift', 'distanceFade', 'echoLength', 'reverse', 'lineColor', 'history', 'layerDepth', 'air', 'glow', 'hold', 'transition', 'bpm', 'accent', 'twist', 'ribbon', 'ribbonWidth', 'cropMarks', 'tick', 'gap', 'turnRate', 'layers', 'stackGap', 'stackTwist', 'boldEvery', 'thinAlpha']);
 
 /* =========================================================
    Sidebar rendering
@@ -785,7 +787,7 @@ function updateLayers(g, T) {
       const moved = lyP.w < 0 ? 1 : lyA.pos.distanceTo(lyP.pos) + Math.abs(lyA.w - lyP.w) + Math.abs(lyA.h - lyP.h) + (1 - Math.abs(lyA.q.dot(lyP.q))) * 40;
       lyP.pos.copy(lyA.pos); lyP.q.copy(lyA.q); lyP.w = lyA.w; lyP.h = lyA.h;
       if (moved < 0.004 || k === Lh) continue; // still: no echo
-      const age = k / Lh, b = fogB(Math.min(1, 0.55 * Math.pow(1 - age, E.falloff) * p.echoOpacity));
+      const age = k / Lh, b = fogB(Math.min(1, 0.55 * wA * Math.pow(1 - age, E.falloff) * p.echoOpacity));
       if (b < 0) continue;
       const col = airy(lyC.copy(gcol(g, base + (1 - base) * age * p.colorShift)), (p.air ?? 0) * 0.85 * Math.pow(age, 0.7));
       layerRect(d, b, lyA, col);
@@ -810,6 +812,7 @@ const TU = { spin: 3.6, rest: 0.5, move: 0.9, gap: 0.12, hold: 1.6, end: 0.6 };
 function buildTurn(g, base) {
   g.tu = { o: base.clone(), q0: quatFromDeg(-28, 38, 0) }; // seen from above and to the side, so the solid's depth reads
   g.dTurn = fogDyn(g, BRAND.LINE.px, 20000, 1);
+  g.dTurnThin = fogDyn(g, BRAND.LINE.linkPx, 40000, 1); // the in-between layers: thinner and fainter
   g.update = updateTurn;
 }
 function turnTimeline(g) {
@@ -842,11 +845,13 @@ function turnPose(g, TL, T, j, o) {
 }
 const tuA = { pos: new THREE.Vector3(), q: new THREE.Quaternion(), w: 0, h: 0 }, tuP = { pos: new THREE.Vector3(), q: new THREE.Quaternion(), w: -1, h: 0 };
 function updateTurn(g, T) {
-  const p = g.p, TL = turnTimeline(g), N = TL.N, d = g.dTurn;
+  const p = g.p, TL = turnTimeline(g), N = TL.N, dB = g.dTurn, dT = g.dTurnThin, every = Math.round(p.boldEvery || 0);
   const Lh = Math.min(40, Math.round(p.echoLength)), dt = 0.25 / p.echoDensity, E = BRAND.ECHO;
-  dynBegin(d);
+  dynBegin(dB); dynBegin(dT);
   for (let j = 0; j < N; j++) {
     const base = (N > 1 ? j / (N - 1) : 0) * p.colorShift;
+    // only some layers are drawn bold (the first, the last and every few in between); the rest are thin, faint lines
+    const bold = !every || j === 0 || j === N - 1 || j % every === 0, d = bold ? dB : dT, wA = bold ? 1 : (p.thinAlpha ?? 0.35);
     tuP.w = -1;
     for (let k = Lh; k >= 1; k--) { // stepped echoes, oldest first, only where the layer was moving
       const te = T - k * dt, tc = Math.max(0, te) % TL.len;
@@ -855,13 +860,13 @@ function updateTurn(g, T) {
       const moved = tuP.w < 0 ? 0 : tuA.pos.distanceTo(tuP.pos) + Math.abs(tuA.w - tuP.w) + Math.abs(tuA.h - tuP.h) + (1 - Math.abs(tuA.q.dot(tuP.q))) * 40;
       tuP.pos.copy(tuA.pos); tuP.q.copy(tuA.q); tuP.w = tuA.w; tuP.h = tuA.h;
       if (moved < 0.004) continue;
-      const age = k / Lh, b = fogB(Math.min(1, 0.55 * Math.pow(1 - age, E.falloff) * p.echoOpacity));
+      const age = k / Lh, b = fogB(Math.min(1, 0.55 * wA * Math.pow(1 - age, E.falloff) * p.echoOpacity));
       if (b < 0) continue;
       layerRect(d, b, tuA, airy(lyC.copy(gcol(g, base + (1 - base) * age * p.colorShift)), (p.air ?? 0) * 0.85 * Math.pow(age, 0.7)));
     }
-    if (turnPose(g, TL, T, j, tuA)) layerRect(d, fogB(0.95), tuA, lyC.copy(gcol(g, base)));
+    if (turnPose(g, TL, T, j, tuA)) layerRect(d, fogB(0.95 * wA), tuA, lyC.copy(gcol(g, base)));
   }
-  dynEnd(d);
+  dynEnd(dB); dynEnd(dT);
 }
 const easeSnap = x => (x < 0.5 ? 8 * x * x * x * x : 1 - Math.pow(-2 * x + 2, 4) / 2); // quick, clean move with no bounce
 const lerpRect = (a, b, e) => ({ x0: a.x0 + (b.x0 - a.x0) * e, x1: a.x1 + (b.x1 - a.x1) * e, y0: a.y0 + (b.y0 - a.y0) * e, y1: a.y1 + (b.y1 - a.y1) * e });

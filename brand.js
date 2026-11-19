@@ -125,7 +125,7 @@ export const CATEGORIES = [
     shape: { ko: '크기가 바뀌는 평면 사각형', en: 'A flat rectangle that changes size' },
     rule: { ko: '평면 이미지가 쌓여 입체가 되고, 다시 평면으로 돌아간다', en: 'A flat image stacks up into a solid, then returns to flat' },
     ref: { ko: '이미지를 이루는 레이어, 평면과 입체를 오가는 디지털 이미지', en: 'The layers an image is made of; digital images moving between flat and solid' },
-    defaults: { ...COMMON, count: 1, aspect: 'mix', steps: 4, duration: 0.9, interval: 0.9, layers: 5, stackGap: 1, size: 1, echoLength: 14, echoDensity: 2.5, colorShift: 0.8 },
+    defaults: { ...COMMON, count: 1, aspect: 'mix', steps: 4, duration: 0.9, interval: 0.9, layers: 21, boldEvery: 5, thinAlpha: 0.25, stackGap: 1, size: 1, echoLength: 24, echoDensity: 4, colorShift: 0.8 },
   },
 ];
 
