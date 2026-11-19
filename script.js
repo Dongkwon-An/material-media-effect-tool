@@ -2,8 +2,8 @@ import * as THREE from 'three';
 import { LineSegments2 } from 'three/addons/lines/LineSegments2.js';
 import { LineSegmentsGeometry } from 'three/addons/lines/LineSegmentsGeometry.js';
 import { LineMaterial } from 'three/addons/lines/LineMaterial.js';
-import * as BRAND from './brand.js?v=20261119b'; // ?v= makes the browser load fresh copies after an update
-import { I18N } from './i18n.js?v=20261119b';
+import * as BRAND from './brand.js?v=20261119c'; // ?v= makes the browser load fresh copies after an update
+import { I18N } from './i18n.js?v=20261119c';
 
 /* =========================================================
    State
@@ -787,7 +787,7 @@ function updateLayers(g, T) {
       const moved = lyP.w < 0 ? 1 : lyA.pos.distanceTo(lyP.pos) + Math.abs(lyA.w - lyP.w) + Math.abs(lyA.h - lyP.h) + (1 - Math.abs(lyA.q.dot(lyP.q))) * 40;
       lyP.pos.copy(lyA.pos); lyP.q.copy(lyA.q); lyP.w = lyA.w; lyP.h = lyA.h;
       if (moved < 0.004 || k === Lh) continue; // still: no echo
-      const age = k / Lh, b = fogB(Math.min(1, 0.55 * wA * Math.pow(1 - age, E.falloff) * p.echoOpacity));
+      const age = k / Lh, b = fogB(Math.min(1, 0.55 * Math.pow(1 - age, E.falloff) * p.echoOpacity));
       if (b < 0) continue;
       const col = airy(lyC.copy(gcol(g, base + (1 - base) * age * p.colorShift)), (p.air ?? 0) * 0.85 * Math.pow(age, 0.7));
       layerRect(d, b, lyA, col);
