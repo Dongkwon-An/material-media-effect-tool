@@ -2,8 +2,8 @@ import * as THREE from 'three';
 import { LineSegments2 } from 'three/addons/lines/LineSegments2.js';
 import { LineSegmentsGeometry } from 'three/addons/lines/LineSegmentsGeometry.js';
 import { LineMaterial } from 'three/addons/lines/LineMaterial.js';
-import * as BRAND from './brand.js?v=20261119c'; // ?v= makes the browser load fresh copies after an update
-import { I18N } from './i18n.js?v=20261119c';
+import * as BRAND from './brand.js?v=20261119d'; // ?v= makes the browser load fresh copies after an update
+import { I18N } from './i18n.js?v=20261119d';
 
 /* =========================================================
    State
@@ -39,7 +39,7 @@ const R = {
   spacing: { k: 'spacing', c: true, type: 'range', label: 'spacing', min: 0, max: 2.5, step: 0.05, unit: '×' },
   behaviour: { k: 'behaviour', c: true, type: 'select', label: 'behaviour', opts: [['independent', 'independent'], ['sync', 'sync'], ['sequential', 'sequential']] },
   reverse: { k: 'reverse', c: true, type: 'check', label: 'reverse' },
-  lineColor: { k: 'lineColor', c: true, type: 'select', label: 'lineColor', opts: [['category', 'lcCategory'], ['white', 'lcWhite']] },
+  lineColor: { k: 'lineColor', c: true, type: 'select', label: 'lineColor', opts: [['category', 'lcCategory'], ['white', 'lcWhite'], ['black', 'lcBlack']] },
   duration: { k: 'duration', c: true, type: 'range', label: 'duration', min: 0.8, max: 8, step: 0.1, unit: 's' },
   interval: { k: 'interval', c: true, type: 'range', label: 'interval', min: 0, max: 5, step: 0.1, unit: 's' },
   swing: { k: 'swing', c: true, type: 'range', label: 'swing', min: 10, max: 90, step: 1, unit: '°' },
@@ -1429,7 +1429,7 @@ function updateNeon(g, T) {
     }
     tubeAt(g, tb, T, len, W0);
     GLOW_LAYERS.forEach((l, li) => {
-      const w = li === 0 ? coreWhite : l.white;
+      const w = p.lineColor === 'black' ? 0 : li === 0 ? coreWhite : l.white; // black light keeps no white core
       nCol.copy(gcol(g, tb.hue * 0.5 * p.colorShift)).lerp(nWhite, w);
       nCol2.copy(gcol(g, (tb.hue * 0.5 + 0.5) * p.colorShift)).lerp(nWhite, w);
       dynSeg(g.glow[li], 0, nP0, nP1, nCol, nCol2);
@@ -1629,6 +1629,7 @@ function colorsFor(u) {
   let list = catColors(u.cat).map(h => new THREE.Color(h)), stops = u.cat.stops || list.map((_, i) => i / (list.length - 1));
   if (u.p.reverse) { list = list.reverse(); stops = stops.map(x => 1 - x).reverse(); }
   if (u.p.lineColor === 'white') { list = [new THREE.Color('#FFFFFF'), new THREE.Color('#FFFFFF')]; stops = [0, 1]; }
+  if (u.p.lineColor === 'black') { list = [new THREE.Color('#000000'), new THREE.Color('#000000')]; stops = [0, 1]; }
   u._col = { A: list[0], B: list[list.length - 1], list, stops }; u._colKey = key;
   return u._col;
 }
