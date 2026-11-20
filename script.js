@@ -2,8 +2,8 @@ import * as THREE from 'three';
 import { LineSegments2 } from 'three/addons/lines/LineSegments2.js';
 import { LineSegmentsGeometry } from 'three/addons/lines/LineSegmentsGeometry.js';
 import { LineMaterial } from 'three/addons/lines/LineMaterial.js';
-import * as BRAND from './brand.js?v=20261120b'; // ?v= makes the browser load fresh copies after an update
-import { I18N } from './i18n.js?v=20261120b';
+import * as BRAND from './brand.js?v=20261120c'; // ?v= makes the browser load fresh copies after an update
+import { I18N } from './i18n.js?v=20261120c';
 
 /* =========================================================
    State
@@ -1305,19 +1305,19 @@ function danceHead(g, d, T, out) {
 }
 function buildDance(g, base, W0) {
   const p = g.p, n = p.count, sp = p.spread;
-  g.stage = { o: base.clone(), R: W0 * 0.34 * p.amplitude * sp };
+  g.stage = { o: base.clone(), R: W0 * 0.28 * p.amplitude * sp }; // kept a little smaller so the whole group stays in the frame
   g.dancers = [];
   for (let i = 0; i < n; i++) {
     const mode = p.behaviour;
-    // canon: the same movement, but each performer starts 12 counts later and in its own corner of the stage,
-    //        so they echo one another without following each other's tail
-    // unison: everyone does the same movement at the same time, side by side
-    // mirror: performers face each other: every second one does the movement left-right reversed
-    const ang = (i / Math.max(1, n)) * Math.PI * 2;
-    const delay = mode === 'canon' ? -i * 12 : 0;
-    const offset = mode === 'unison' ? new THREE.Vector3((i - (n - 1) / 2) * W0 * 0.3, 0, 0)
-      : mode === 'mirror' ? new THREE.Vector3((i % 2 ? 1 : -1) * W0 * 0.12, 0, -Math.floor(i / 2) * W0 * 0.25)
-      : new THREE.Vector3(Math.cos(ang) * W0 * 0.22, 0, Math.sin(ang) * W0 * 0.15);
+    // the performers move as one group, so their lines read together instead of each going its own way:
+    // canon: the same movement, each performer 2 counts after the one before, a little to the side and behind,
+    //        so the lines flow in parallel like one wave passing through the group (never along the same track)
+    // unison: everyone does the same movement at the same time, close side by side
+    // mirror: performers face each other: every second one does the movement left-right reversed, close together
+    const delay = mode === 'canon' ? -i * 2 : 0;
+    const offset = mode === 'unison' ? new THREE.Vector3((i - (n - 1) / 2) * W0 * 0.14, 0, 0)
+      : mode === 'mirror' ? new THREE.Vector3(0, (Math.floor(i / 2) - (Math.ceil(n / 2) - 1) / 2) * W0 * 0.12, 0)
+      : new THREE.Vector3(0, (i - (n - 1) / 2) * W0 * 0.07, -(i - (n - 1) / 2) * W0 * 0.1);
     g.dancers.push({ delay, offset, seed: 1, mirror: mode === 'mirror' && i % 2 === 1 ? -1 : 1, hue: n > 1 ? i / (n - 1) : 0 });
   }
   const maxS = 2 + Math.round(p.strands);
