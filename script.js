@@ -2,8 +2,8 @@ import * as THREE from 'three';
 import { LineSegments2 } from 'three/addons/lines/LineSegments2.js';
 import { LineSegmentsGeometry } from 'three/addons/lines/LineSegmentsGeometry.js';
 import { LineMaterial } from 'three/addons/lines/LineMaterial.js';
-import * as BRAND from './brand.js?v=20261120e'; // ?v= makes the browser load fresh copies after an update
-import { I18N } from './i18n.js?v=20261120e';
+import * as BRAND from './brand.js?v=20261120f'; // ?v= makes the browser load fresh copies after an update
+import { I18N } from './i18n.js?v=20261120f';
 
 /* =========================================================
    State
@@ -2023,6 +2023,22 @@ function exportVideoRealtime() {
   setTimeout(() => rec.stop(), state.exportDuration * 1000);
 }
 
+// cut a screen-space segment to the frame (Liang–Barsky); false if nothing of it is inside
+function clipToFrame(a, b, W, H) {
+  let t0 = 0, t1 = 1;
+  const dx = b.x - a.x, dy = b.y - a.y;
+  const test = (p, q) => {
+    if (p === 0) return q >= 0;
+    const r = q / p;
+    if (p < 0) { if (r > t1) return false; if (r > t0) t0 = r; } else { if (r < t0) return false; if (r < t1) t1 = r; }
+    return true;
+  };
+  if (!test(-dx, a.x) || !test(dx, W - a.x) || !test(-dy, a.y) || !test(dy, H - a.y)) return false;
+  const ax = a.x, ay = a.y;
+  if (t1 < 1) { b.x = ax + dx * t1; b.y = ay + dy * t1; }
+  if (t0 > 0) { a.x = ax + dx * t0; a.y = ay + dy * t0; }
+  return true;
+}
 function exportSVG() {
   if (guardEmpty()) return;
   const svg = withExportSize((W, H) => {
@@ -2047,14 +2063,13 @@ function exportSVG() {
         // near-identical colours share a path, repeated segments and ones outside the frame are dropped,
         // and coordinates are written with one decimal
         const r1 = x => Math.round(x * 10) / 10, seen = new Set(), paths = [], open = new Map(), heads = new Map();
-        const inside = (x1, y1, x2, y2) => !(Math.max(x1, x2) < -20 || Math.min(x1, x2) > W + 20 || Math.max(y1, y2) < -20 || Math.min(y1, y2) > H + 20);
         for (let k = 0; k < l.n; k++) {
           const i = k * 6;
           v.set(l.pos[i], l.pos[i + 1], l.pos[i + 2]); const ok1 = toScreen(v, a);
           v.set(l.pos[i + 3], l.pos[i + 4], l.pos[i + 5]); const ok2 = toScreen(v, b);
           if (!ok1 || !ok2) continue;
+          if (!clipToFrame(a, b, W, H)) continue; // only what is inside the frame is saved
           const x1 = r1(a.x), y1 = r1(a.y), x2 = r1(b.x), y2 = r1(b.y);
-          if (!inside(x1, y1, x2, y2)) continue;
           const key = x1 < x2 || (x1 === x2 && y1 <= y2) ? `${x1},${y1},${x2},${y2}` : `${x2},${y2},${x1},${y1}`;
           if (seen.has(key)) continue;
           seen.add(key);
@@ -2086,7 +2101,10 @@ function exportSVG() {
             if (!heads.has(sk)) heads.set(sk, Q);
           }
         }
-        const out = paths.map(P => `<path stroke="${P.col}" d="M${P.pts.join(' ')}"/>`);
+        // one path element per colour (its pieces as sub-paths), so editors get far fewer objects to handle
+        const byCol = new Map();
+        paths.forEach(P => { const d = 'M' + P.pts.join(' '); byCol.has(P.col) ? byCol.get(P.col).push(d) : byCol.set(P.col, [d]); });
+        const out = [...byCol].map(([c, ds]) => `<path stroke="${c}" d="${ds.join('')}"/>`);
         if (out.length) s += `<g id="${id}-d${di + 1}-${li + 1}" stroke-opacity="${l.mesh.material.opacity.toFixed(3)}" stroke-width="${(d.px * sc).toFixed(2)}" stroke-linecap="round" stroke-linejoin="round" fill="none">${out.join('')}</g>\n`;
       }));
       g.units.forEach((u, ui) => {
@@ -2097,7 +2115,7 @@ function exportSVG() {
           for (let k = 0; k < UNIT_EDGES.length; k += 6) {
             v.set(UNIT_EDGES[k], UNIT_EDGES[k + 1], UNIT_EDGES[k + 2]).applyMatrix4(m.matrixWorld); const ok1 = toScreen(v, a);
             v.set(UNIT_EDGES[k + 3], UNIT_EDGES[k + 4], UNIT_EDGES[k + 5]).applyMatrix4(m.matrixWorld); const ok2 = toScreen(v, b);
-            if (ok1 && ok2) lines += seg();
+            if (ok1 && ok2 && clipToFrame(a, b, W, H)) lines += seg();
           }
           if (lines) s += `<g id="${id}-u${ui + 1}-${i === 0 ? 'screen' : `echo-${String(i).padStart(3, '0')}`}" stroke="#${m.material.color.getHexString()}" stroke-opacity="${m.material.opacity.toFixed(3)}" stroke-width="${(BRAND.LINE.px * sc).toFixed(2)}" stroke-linecap="round" fill="none">${lines}</g>\n`;
         }
