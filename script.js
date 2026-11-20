@@ -2,8 +2,8 @@ import * as THREE from 'three';
 import { LineSegments2 } from 'three/addons/lines/LineSegments2.js';
 import { LineSegmentsGeometry } from 'three/addons/lines/LineSegmentsGeometry.js';
 import { LineMaterial } from 'three/addons/lines/LineMaterial.js';
-import * as BRAND from './brand.js?v=20261119d'; // ?v= makes the browser load fresh copies after an update
-import { I18N } from './i18n.js?v=20261119d';
+import * as BRAND from './brand.js?v=20261120a'; // ?v= makes the browser load fresh copies after an update
+import { I18N } from './i18n.js?v=20261120a';
 
 /* =========================================================
    State
@@ -1274,22 +1274,22 @@ function walkState(u, time, out) {
    Why this rhythm: a performance follows a score; here the score counts in
      beats (BPM) and 8-count phrases, with an accent on each beat.
    --------------------------------------------------------- */
-// The score: four set paths, always the same, danced one after another and then again from the start.
-// Every path turns only one way, with no S-bends and no corners: a wide flat orbit, an upright loop,
-// a slanted loop, and a coil (two smaller circles that rise and sink, like a spin). Each path takes 16 counts.
-const DANCE_PATHS = ['orbit', 'upright', 'slant', 'coil'], PATH_BEATS = 16;
-const FIG1 = [0, 0, 0], FIG2 = [0, 0, 0];
-const setF = (o, x, y, z) => { o[0] = x; o[1] = y; o[2] = z; return o; };
-function pathAt(name, a, R, o) {
-  // a: angle around the path (0 … 2π for one round); always the same turning direction, so the line only ever curves one way.
-  // Every path starts and ends at the same point (right side of the stage, at mid height) heading the same way,
-  // so passing from one path into the next is one smooth continuous turn
-  const c = Math.cos(a), s = Math.sin(a);
-  if (name === 'orbit') return setF(o, R * 1.2 * c, R * 0.25 * s, R * 0.9 * s);           // wide and nearly flat, like walking a circle on the stage
-  if (name === 'upright') return setF(o, R * 1.2 * c, R * 0.8 * s, R * 0.5 * s);           // standing up, like an arm sweeping a big circle
-  if (name === 'slant') return setF(o, R * 1.2 * c, R * 0.5 * s, R * 0.75 * s);            // tilted between the two
-  // coil: two smaller turns in one round (seen from above, always the same way round) that rise and sink like a spin
-  return setF(o, R * (0.4 + 0.8 * Math.cos(2 * a)), R * 0.55 * s, R * 0.7 * Math.sin(2 * a));
+// The movement: no set track any more. Each performer's hand follows a free path made of a few slow, overlapping
+// swings on every axis (like a body turning, reaching, stepping back). The swings have unrelated lengths, so the
+// path turns this way and that, in all directions, and hardly ever repeats. They are slow (tens of counts), so
+// every bend stays wide and soft: no corners, no tight wiggles.
+const SWINGS = [ // [period in counts, size] per axis
+  [[17, 1.0], [29, 0.5], [47, 0.3]],    // x: across the stage
+  [[23, 0.45], [37, 0.3], [59, 0.2]],   // y: up and down
+  [[19, 0.85], [31, 0.45], [53, 0.3]],  // z: toward and away from the viewer
+];
+function freePath(tau, seed, R, out) {
+  const TAU = Math.PI * 2, v = [0, 0, 0];
+  for (let ax = 0; ax < 3; ax++) for (let k = 0; k < 3; k++) {
+    const [per, amp] = SWINGS[ax][k], ph = seeded(seed * 17 + ax * 5 + k) * TAU;
+    v[ax] += amp * Math.sin(TAU * tau / per + ph);
+  }
+  return out.set(R * v[0], R * v[1], R * v[2]);
 }
 const dvA = new THREE.Vector3(), dvB = new THREE.Vector3(), dvC = new THREE.Vector3(), dvD = new THREE.Vector3();
 function danceHead(g, d, T, out) {
@@ -1297,34 +1297,28 @@ function danceHead(g, d, T, out) {
   const p = g.p, S = g.stage, beat = 60 / p.bpm, B = T / beat + d.delay;
   const b = Math.floor(B), f = B - b, acc = Math.min(0.9, p.accent);
   const tau = b + f + (acc / (2 * Math.PI)) * Math.sin(2 * Math.PI * f); // accent 0 = an even, flowing pace
-  const k = Math.floor(tau / PATH_BEATS), u = (tau - PATH_BEATS * k) / PATH_BEATS, a = Math.PI * 2 * u;
-  const NP = DANCE_PATHS.length, cur = DANCE_PATHS[((k % NP) + NP) % NP], nxt = DANCE_PATHS[(((k + 1) % NP) + NP) % NP];
-  const f1 = pathAt(cur, a, S.R, FIG1), f2 = pathAt(nxt, a, S.R, FIG2);
-  const w = THREE.MathUtils.smootherstep(u, 0.55, 1); // the last part of each round eases slowly into the next path, with no kink
-  out.set(f1[0] * (1 - w) + f2[0] * w, f1[1] * (1 - w) + f2[1] * w, f1[2] * (1 - w) + f2[2] * w);
-  // freer, but still only round turns: the circle breathes wider and narrower as it goes (gently enough that it
-  // never bends back the other way), and the whole path drifts slowly around the stage over the full score
-  const ph = Math.PI * 2 * tau / (PATH_BEATS * NP), Rr = S.R;
-  const breathe = 1 + 0.14 * Math.sin(2 * a + 3 * ph); // continuous across the change of path (no jump, no step)
-  out.x *= breathe; out.z *= breathe;
-  out.x += Rr * 0.35 * Math.cos(ph); out.y += Rr * 0.15 * Math.sin(2 * ph); out.z += Rr * 0.3 * Math.sin(ph);
+  freePath(tau, d.seed, S.R, out);
   out.x *= d.mirror;
   out.add(d.offset).add(S.o);
-  // the body turns a quarter turn on every beat (× twist), so the line form rolls with it
-  return Math.PI * p.twist * tau * 0.25; // one steady direction, so the twist never jumps
+  // the body turns with the music, and the turn now goes back and forth instead of always one way
+  return Math.PI * p.twist * (tau * 0.25 + 1.5 * Math.sin(tau / 11 + d.seed));
 }
 function buildDance(g, base, W0) {
   const p = g.p, n = p.count, sp = p.spread;
-  g.stage = { o: base.clone(), R: W0 * 0.34 * p.amplitude * sp }; // the paths are centred on the stage
+  g.stage = { o: base.clone(), R: W0 * 0.34 * p.amplitude * sp };
   g.dancers = [];
   for (let i = 0; i < n; i++) {
     const mode = p.behaviour;
-    // canon: each performer starts later on the same paths, so they follow one another around them
-    // unison: everyone dances the same score side by side
-    // mirror: every second performer dances the score left-right reversed
-    const delay = mode === 'canon' ? -i * 4 : 0;
-    const offset = mode === 'unison' ? new THREE.Vector3((i - (n - 1) / 2) * W0 * 0.25, 0, 0) : mode === 'mirror' ? new THREE.Vector3(0, 0, (Math.floor(i / 2)) * -W0 * 0.2) : new THREE.Vector3();
-    g.dancers.push({ delay, offset, mirror: mode === 'mirror' && i % 2 === 1 ? -1 : 1, hue: n > 1 ? i / (n - 1) : 0 });
+    // canon: the same movement, but each performer starts 12 counts later and in its own corner of the stage,
+    //        so they echo one another without following each other's tail
+    // unison: everyone does the same movement at the same time, side by side
+    // mirror: performers face each other: every second one does the movement left-right reversed
+    const ang = (i / Math.max(1, n)) * Math.PI * 2;
+    const delay = mode === 'canon' ? -i * 12 : 0;
+    const offset = mode === 'unison' ? new THREE.Vector3((i - (n - 1) / 2) * W0 * 0.3, 0, 0)
+      : mode === 'mirror' ? new THREE.Vector3((i % 2 ? 1 : -1) * W0 * 0.12, 0, -Math.floor(i / 2) * W0 * 0.25)
+      : new THREE.Vector3(Math.cos(ang) * W0 * 0.22, 0, Math.sin(ang) * W0 * 0.15);
+    g.dancers.push({ delay, offset, seed: 1, mirror: mode === 'mirror' && i % 2 === 1 ? -1 : 1, hue: n > 1 ? i / (n - 1) : 0 });
   }
   const maxS = 2 + Math.round(p.strands);
   // one opacity per layer: the ribbon fades by colour (toward the background), not in steps, so it never looks chopped
