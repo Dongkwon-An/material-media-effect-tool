@@ -2,8 +2,8 @@ import * as THREE from 'three';
 import { LineSegments2 } from 'three/addons/lines/LineSegments2.js';
 import { LineSegmentsGeometry } from 'three/addons/lines/LineSegmentsGeometry.js';
 import { LineMaterial } from 'three/addons/lines/LineMaterial.js';
-import * as BRAND from './brand.js?v=20261120d'; // ?v= makes the browser load fresh copies after an update
-import { I18N } from './i18n.js?v=20261120d';
+import * as BRAND from './brand.js?v=20261120e'; // ?v= makes the browser load fresh copies after an update
+import { I18N } from './i18n.js?v=20261120e';
 
 /* =========================================================
    State
@@ -2042,16 +2042,52 @@ function exportSVG() {
       const g = groups[id];
       s += `<g id="${id}">\n`;
       g.dyn.forEach((d, di) => d.layers.forEach((l, li) => {
-        if (!l.mesh.visible) return;
-        let lines = '';
-        const hex = (r, gg, bb) => '#' + tmpColor.setRGB(r, gg, bb).getHexString();
+        if (!l.mesh.visible || l.mesh.material.opacity < 0.01) return;
+        // lighter SVG: segments that join end to end become one path, nearly straight runs keep only their ends,
+        // near-identical colours share a path, repeated segments and ones outside the frame are dropped,
+        // and coordinates are written with one decimal
+        const r1 = x => Math.round(x * 10) / 10, seen = new Set(), paths = [], open = new Map(), heads = new Map();
+        const inside = (x1, y1, x2, y2) => !(Math.max(x1, x2) < -20 || Math.min(x1, x2) > W + 20 || Math.max(y1, y2) < -20 || Math.min(y1, y2) > H + 20);
         for (let k = 0; k < l.n; k++) {
           const i = k * 6;
           v.set(l.pos[i], l.pos[i + 1], l.pos[i + 2]); const ok1 = toScreen(v, a);
           v.set(l.pos[i + 3], l.pos[i + 4], l.pos[i + 5]); const ok2 = toScreen(v, b);
-          if (ok1 && ok2) lines += `<line x1="${a.x.toFixed(2)}" y1="${a.y.toFixed(2)}" x2="${b.x.toFixed(2)}" y2="${b.y.toFixed(2)}" stroke="${hex(l.col[i], l.col[i + 1], l.col[i + 2])}"/>`;
+          if (!ok1 || !ok2) continue;
+          const x1 = r1(a.x), y1 = r1(a.y), x2 = r1(b.x), y2 = r1(b.y);
+          if (!inside(x1, y1, x2, y2)) continue;
+          const key = x1 < x2 || (x1 === x2 && y1 <= y2) ? `${x1},${y1},${x2},${y2}` : `${x2},${y2},${x1},${y1}`;
+          if (seen.has(key)) continue;
+          seen.add(key);
+          const R = l.col[i], G = l.col[i + 1], B = l.col[i + 2];
+          // join onto a path that ends where this segment starts, or that starts where this segment ends
+          // (segments of one line can come in either order)
+          const near = P => P && Math.abs(R - P.r) + Math.abs(G - P.g) + Math.abs(B - P.b) < 0.12;
+          const sk = `${x1},${y1}`, ek = `${x2},${y2}`, P = open.get(sk), Pf = heads.get(ek);
+          if (near(P)) {
+            open.delete(sk);
+            const pts = P.pts, n = pts.length;
+            const ax = pts[n - 4], ay = pts[n - 3], bx = pts[n - 2], by = pts[n - 1];
+            const cross = (bx - ax) * (y2 - ay) - (by - ay) * (x2 - ax), len = Math.hypot(x2 - ax, y2 - ay) || 1;
+            if (Math.abs(cross) / len < 0.25 && (bx - ax) * (x2 - bx) + (by - ay) * (y2 - by) >= 0) { pts[n - 2] = x2; pts[n - 1] = y2; } // straight on: move the end
+            else pts.push(x2, y2);
+            if (!open.has(ek)) open.set(ek, P);
+          } else if (near(Pf)) {
+            heads.delete(ek);
+            const pts = Pf.pts;
+            const ax = pts[2], ay = pts[3], bx = pts[0], by = pts[1];
+            const cross = (bx - ax) * (y1 - ay) - (by - ay) * (x1 - ax), len = Math.hypot(x1 - ax, y1 - ay) || 1;
+            if (Math.abs(cross) / len < 0.25 && (bx - ax) * (x1 - bx) + (by - ay) * (y1 - by) >= 0) { pts[0] = x1; pts[1] = y1; } // straight on: move the start
+            else pts.unshift(x1, y1);
+            if (!heads.has(sk)) heads.set(sk, Pf);
+          } else {
+            const Q = { pts: [x1, y1, x2, y2], r: R, g: G, b: B, col: '#' + tmpColor.setRGB(R, G, B).getHexString() };
+            paths.push(Q);
+            if (!open.has(ek)) open.set(ek, Q);
+            if (!heads.has(sk)) heads.set(sk, Q);
+          }
         }
-        if (lines) s += `<g id="${id}-d${di + 1}-${li + 1}" stroke-opacity="${l.mesh.material.opacity.toFixed(3)}" stroke-width="${(d.px * sc).toFixed(2)}" stroke-linecap="round" fill="none">${lines}</g>\n`;
+        const out = paths.map(P => `<path stroke="${P.col}" d="M${P.pts.join(' ')}"/>`);
+        if (out.length) s += `<g id="${id}-d${di + 1}-${li + 1}" stroke-opacity="${l.mesh.material.opacity.toFixed(3)}" stroke-width="${(d.px * sc).toFixed(2)}" stroke-linecap="round" stroke-linejoin="round" fill="none">${out.join('')}</g>\n`;
       }));
       g.units.forEach((u, ui) => {
         for (let i = u.meshes.length - 1; i >= 0; i--) {
