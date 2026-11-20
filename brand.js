@@ -114,7 +114,7 @@ export const CATEGORIES = [
     shape: { ko: '퍼포머의 움직임을 표현하는 선형', en: 'Line forms that trace the performers’ movement' },
     rule: { ko: '선이 몸짓처럼 부드럽게 무대를 움직이며, 캐논·유니즌·미러의 세 방식으로 함께 움직인다', en: 'Lines move softly across the stage like gestures, together in three ways: canon, unison and mirror' },
     ref: { ko: '모션 캡처의 움직임 궤적(Ghostcatching), 로이 풀러의 서펜타인 댄스, 라반의 트레이스 폼, 커닝햄의 무대 공간', en: 'Motion-capture trails (Ghostcatching), Loïe Fuller’s Serpentine Dance, Laban’s trace forms, Cunningham’s stage space' },
-    defaults: { ...COMMON, count: 4, behaviour: 'canon', bpm: 84, accent: 0, amplitude: 1.2, twist: 0.6, spread: 1, ribbon: 5, ribbonWidth: 1, strands: 4, echoOpacity: 1, colorShift: 0.8, air: 0.5 },
+    defaults: { ...COMMON, count: 4, behaviour: 'canon', bpm: 84, accent: 0, amplitude: 1.2, twist: 0.6, spread: 1, ribbon: 11, ribbonWidth: 1, strands: 4, echoOpacity: 1, colorShift: 0.8, air: 0.5 },
   },
   {
     id: 'digital', motion: 'turn', gradient: 'violet-magenta', camera: 'orbit', fit: 1,
