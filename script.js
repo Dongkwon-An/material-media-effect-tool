@@ -2,8 +2,8 @@ import * as THREE from 'three';
 import { LineSegments2 } from 'three/addons/lines/LineSegments2.js';
 import { LineSegmentsGeometry } from 'three/addons/lines/LineSegmentsGeometry.js';
 import { LineMaterial } from 'three/addons/lines/LineMaterial.js';
-import * as BRAND from './brand.js?v=20261120c'; // ?v= makes the browser load fresh copies after an update
-import { I18N } from './i18n.js?v=20261120c';
+import * as BRAND from './brand.js?v=20261120d'; // ?v= makes the browser load fresh copies after an update
+import { I18N } from './i18n.js?v=20261120d';
 
 /* =========================================================
    State
@@ -1301,7 +1301,7 @@ function danceHead(g, d, T, out) {
   out.x *= d.mirror;
   out.add(d.offset).add(S.o);
   // the body turns with the music, and the turn now goes back and forth instead of always one way
-  return Math.PI * p.twist * (tau * 0.25 + 1.5 * Math.sin(tau / 11 + d.seed));
+  return Math.PI * p.twist * (tau * 0.08 + 0.5 * Math.sin(tau / 13 + d.seed)); // a slow, gentle turn, so the line form twists only now and then
 }
 function buildDance(g, base, W0) {
   const p = g.p, n = p.count, sp = p.spread;
